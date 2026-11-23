@@ -19,6 +19,7 @@ class InPlaceTranslationOverlay @JvmOverloads constructor(
 
     private val results = mutableListOf<TranslationResult>()
     private val toggledRegions = mutableSetOf<String>()
+    var onDismissListener: (() -> Unit)? = null
 
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -31,7 +32,7 @@ class InPlaceTranslationOverlay @JvmOverloads constructor(
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2f
-        color = Color.parseColor("#40FFFFFF")
+        color = Color.parseColor("#80FFFFFF")
     }
 
     fun setResults(newResults: List<TranslationResult>) {
@@ -62,7 +63,7 @@ class InPlaceTranslationOverlay @JvmOverloads constructor(
             val isShowingOriginal = toggledRegions.contains(item.region.id)
             val displayText = if (isShowingOriginal) item.region.originalText else item.translatedText
 
-            val bgColor = item.region.backgroundColor ?: Color.parseColor("#CC1E1E1E")
+            val bgColor = item.region.backgroundColor ?: Color.parseColor("#EE1E1E1E")
             bgPaint.color = bgColor
 
             val textColor = item.region.textColor
@@ -96,8 +97,10 @@ class InPlaceTranslationOverlay @JvmOverloads constructor(
             val x = event.x.toInt()
             val y = event.y.toInt()
 
+            var hitText = false
             for (item in results) {
                 if (item.region.boundingBox.contains(x, y)) {
+                    hitText = true
                     // Toggle between original text and translated text
                     if (toggledRegions.contains(item.region.id)) {
                         toggledRegions.remove(item.region.id)
@@ -107,6 +110,12 @@ class InPlaceTranslationOverlay @JvmOverloads constructor(
                     invalidate()
                     return true
                 }
+            }
+
+            // Tapping empty space dismisses the translation overlay
+            if (!hitText && results.isNotEmpty()) {
+                onDismissListener?.invoke()
+                return true
             }
         }
         return super.onTouchEvent(event)

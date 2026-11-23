@@ -34,6 +34,7 @@ class ScreenCaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createNotificationChannel()
     }
 
@@ -106,6 +107,7 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onDestroy() {
+        instance = null
         captureManager?.release()
         captureManager = null
         mediaProjection?.stop()
@@ -119,5 +121,9 @@ class ScreenCaptureService : Service() {
         const val EXTRA_RESULT_DATA = "extra_result_data"
         private const val CHANNEL_ID = "cream_screen_translator_channel"
         private const val NOTIFICATION_ID = 1001
+
+        @Volatile
+        var instance: ScreenCaptureService? = null
+            private set
     }
 }
