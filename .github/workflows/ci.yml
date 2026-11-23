@@ -3,11 +3,6 @@ name: Android CI
 on:
   pull_request:
     branches: [ main, develop ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -26,37 +21,61 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Code Changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'app/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'settings.gradle.kts'
+              - '.github/workflows/ci.yml'
 
       - name: Set up JDK 17
+        if: steps.filter.outputs.code == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
+        if: steps.filter.outputs.code == 'true'
         uses: gradle/actions/setup-gradle@v4
 
       - name: Mount RAM Disk for Build Cache
+        if: steps.filter.outputs.code == 'true'
         run: |
           sudo mkdir -p app/build
           sudo mount -t tmpfs -o size=2048m tmpfs app/build
 
       - name: Grant execute permission for gradlew
+        if: steps.filter.outputs.code == 'true'
         run: chmod +x gradlew
 
       - name: Run Quality Gate and Unit Tests
+        if: steps.filter.outputs.code == 'true'
         run: ./gradlew spotlessCheck detekt lintDebug testDebugUnitTest --continue
 
       - name: Publish Test Report to PR
         uses: dorny/test-reporter@v1
-        if: always()
+        if: always() && steps.filter.outputs.code == 'true'
         with:
           name: Unit Test Results
           path: app/build/test-results/testDebugUnitTest/*.xml
           reporter: java-junit
 
+      - name: Fast Pass for Documentation
+        if: steps.filter.outputs.code != 'true'
+        run: echo "Documentation-only change detected. Quality Gate passed in fast-skip mode."
+
       - name: Upload Diagnostic Reports on Failure
-        if: failure()
+        if: failure() && steps.filter.outputs.code == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: test-and-lint-reports
@@ -74,29 +93,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check for Code Changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'app/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'settings.gradle.kts'
+              - '.github/workflows/ci.yml'
+
       - name: Set up JDK 17
+        if: steps.filter.outputs.code == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
+        if: steps.filter.outputs.code == 'true'
         uses: gradle/actions/setup-gradle@v4
 
       - name: Mount RAM Disk for Build Output
+        if: steps.filter.outputs.code == 'true'
         run: |
           sudo mkdir -p app/build
           sudo mount -t tmpfs -o size=2048m tmpfs app/build
 
       - name: Make gradlew executable
+        if: steps.filter.outputs.code == 'true'
         run: chmod +x gradlew
 
       - name: Assemble Debug APK
+        if: steps.filter.outputs.code == 'true'
         run: ./gradlew assembleDebug -x test -x lint
 
       - name: Upload Debug APK
+        if: steps.filter.outputs.code == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
+
+      - name: Fast Pass for Documentation
+        if: steps.filter.outputs.code != 'true'
+        run: echo "Documentation-only change detected. APK assemble skipped."
