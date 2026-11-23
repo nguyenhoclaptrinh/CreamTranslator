@@ -22,6 +22,7 @@ import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.cream.translator.R
 import com.cream.translator.core.engine.MlKitOcrEngine
 import com.cream.translator.core.engine.MlKitTranslationEngine
@@ -102,7 +103,12 @@ class OverlayService : Service() {
                 addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
             }
         try {
-            registerReceiver(systemEventsReceiver, filter)
+            ContextCompat.registerReceiver(
+                this,
+                systemEventsReceiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED,
+            )
         } catch (e: Throwable) {
             Timber.w(e, "Không thể đăng ký systemEventsReceiver")
         }

@@ -219,78 +219,26 @@ fun TranslatorDashboard(
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "System Status",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "• App Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
-                Text(text = "• Overlay Permission: ${if (hasOverlayPermission) "Granted" else "Missing"}")
-                Text(
-                    text = "• Offline EN-VI Model: ${if (isModelReady) {
-                        "Ready (Offline)"
-                    } else if (isDownloading) {
-                        "Downloading..."
-                    } else {
-                        "Not Ready"
-                    }}",
-                )
-                Text(text = "• Anti-Cheat Safe: Verified (Zero Accessibility)")
-                val serviceStatus = if (isServiceRunning) "Running (Active)" else "Stopped (Inactive)"
-                Text(
-                    text = "• Translator Service: $serviceStatus",
-                    color =
-                        if (isServiceRunning) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
-        }
+        SystemStatusCard(
+            hasOverlayPermission = hasOverlayPermission,
+            isModelReady = isModelReady,
+            isDownloading = isDownloading,
+            isServiceRunning = isServiceRunning,
+        )
 
-        if (!hasOverlayPermission) {
-            Button(
-                onClick = actions.onRequestOverlayPermission,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Grant Overlay Permission")
-            }
-        } else if (isServiceRunning) {
-            Button(
-                onClick = actions.onStopService,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Stop Translator Service")
-            }
-        } else {
-            Button(
-                onClick = actions.onStartService,
-                enabled = isModelReady,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Start Translator Service")
-            }
-        }
-
-        OutlinedButton(
-            onClick = {
+        TranslatorControlButtons(
+            hasOverlayPermission = hasOverlayPermission,
+            isServiceRunning = isServiceRunning,
+            isModelReady = isModelReady,
+            actions = actions,
+            onTriggerModelDownload = {
                 isDownloading = true
                 actions.onDownloadModel(LanguagePair("en", "vi")) { success ->
                     isModelReady = success
                     isDownloading = false
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Re-verify Offline Model")
-        }
+        )
 
         OutlinedButton(
             onClick = actions.onCheckUpdate,
@@ -315,6 +263,90 @@ fun TranslatorDashboard(
             onDismiss = actions.onDismissUpdateDialog,
             onInstall = actions.onInstallApk,
         )
+    }
+}
+
+@Composable
+private fun SystemStatusCard(
+    hasOverlayPermission: Boolean,
+    isModelReady: Boolean,
+    isDownloading: Boolean,
+    isServiceRunning: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "System Status",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "• App Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
+            Text(text = "• Overlay Permission: ${if (hasOverlayPermission) "Granted" else "Missing"}")
+            Text(
+                text = "• Offline EN-VI Model: ${if (isModelReady) {
+                    "Ready (Offline)"
+                } else if (isDownloading) {
+                    "Downloading..."
+                } else {
+                    "Not Ready"
+                }}",
+            )
+            Text(text = "• Anti-Cheat Safe: Verified (Zero Accessibility)")
+            val serviceStatus = if (isServiceRunning) "Running (Active)" else "Stopped (Inactive)"
+            Text(
+                text = "• Translator Service: $serviceStatus",
+                color =
+                    if (isServiceRunning) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranslatorControlButtons(
+    hasOverlayPermission: Boolean,
+    isServiceRunning: Boolean,
+    isModelReady: Boolean,
+    actions: DashboardActions,
+    onTriggerModelDownload: () -> Unit,
+) {
+    if (!hasOverlayPermission) {
+        Button(
+            onClick = actions.onRequestOverlayPermission,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Grant Overlay Permission")
+        }
+    } else if (isServiceRunning) {
+        Button(
+            onClick = actions.onStopService,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Stop Translator Service")
+        }
+    } else {
+        Button(
+            onClick = actions.onStartService,
+            enabled = isModelReady,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Start Translator Service")
+        }
+    }
+
+    OutlinedButton(
+        onClick = onTriggerModelDownload,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Re-verify Offline Model")
     }
 }
 
