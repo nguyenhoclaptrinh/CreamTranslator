@@ -1,6 +1,7 @@
 package com.cream.translator.core.engine.filter
 
 import com.cream.translator.core.model.FilterConfig
+import com.cream.translator.core.model.LanguagePair
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,5 +128,46 @@ class DefaultTextFilterTest {
         assertTrue(filter.shouldFilter("OK"))
         assertFalse(filter.shouldFilter("123"))
         assertFalse(filter.shouldFilter("99%"))
+    }
+
+    @Test
+    fun shouldFilter_vietnameseTextWhenTargetIsVietnamese_returnsTrue() {
+        val enViPair = LanguagePair("en", "vi")
+
+        assertTrue(defaultFilter.shouldFilter("Cài đặt bộ lọc từ", enViPair))
+        assertTrue(defaultFilter.shouldFilter("Kiểm tra bản cập nhật", enViPair))
+        assertTrue(defaultFilter.shouldFilter("Trình dịch màn hình game on-device", enViPair))
+        assertTrue(defaultFilter.shouldFilter("Đã cấp", enViPair))
+        assertTrue(defaultFilter.shouldFilter("Hệ thống", enViPair))
+    }
+
+    @Test
+    fun shouldFilter_englishTextWhenPairIsEnToVi_returnsFalse() {
+        val enViPair = LanguagePair("en", "vi")
+
+        assertFalse(defaultFilter.shouldFilter("Hello World", enViPair))
+        assertFalse(defaultFilter.shouldFilter("Stop Translator Service", enViPair))
+        assertFalse(defaultFilter.shouldFilter("Artificial Intelligence is fascinating", enViPair))
+        assertFalse(defaultFilter.shouldFilter("Start new adventure", enViPair))
+    }
+
+    @Test
+    fun shouldFilter_incompatibleScriptsForEnSource_returnsTrue() {
+        val enViPair = LanguagePair("en", "vi")
+
+        // Asian and Cyrillic scripts should be filtered when source is English
+        assertTrue(defaultFilter.shouldFilter("こんにちは", enViPair))
+        assertTrue(defaultFilter.shouldFilter("한국어", enViPair))
+        assertTrue(defaultFilter.shouldFilter("你好世界", enViPair))
+        assertTrue(defaultFilter.shouldFilter("Привет мир", enViPair))
+    }
+
+    @Test
+    fun shouldFilter_japaneseTextWhenPairIsJaToVi_retainsJapaneseAndFiltersVietnamese() {
+        val jaViPair = LanguagePair("ja", "vi")
+
+        assertFalse(defaultFilter.shouldFilter("こんにちは", jaViPair))
+        assertFalse(defaultFilter.shouldFilter("冒険が始まる", jaViPair))
+        assertTrue(defaultFilter.shouldFilter("Cài đặt bộ lọc từ", jaViPair))
     }
 }

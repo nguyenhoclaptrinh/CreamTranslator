@@ -425,8 +425,11 @@ class OverlayService : Service() {
                 return null
             }
 
-            // Lọc bỏ các khối chữ thuộc danh sách từ phổ biến/ký hiệu không cần dịch
-            val eligibleRegions = textRegions.filterNot { textFilter.shouldFilter(it.originalText) }
+            // Lọc bỏ các khối chữ thuộc danh sách từ phổ biến/ký hiệu hoặc không tương thích ngôn ngữ
+            val eligibleRegions =
+                textRegions.filterNot {
+                    textFilter.shouldFilter(it.originalText, currentLanguagePair)
+                }
 
             if (eligibleRegions.isEmpty()) {
                 Timber.d("Toàn bộ các khối chữ nhận diện được đã được lọc bỏ (từ phổ biến/ký hiệu)")

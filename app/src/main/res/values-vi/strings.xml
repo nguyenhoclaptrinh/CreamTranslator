@@ -21,6 +21,7 @@
     <!-- Buttons & Actions -->
     <string name="btn_grant_overlay_permission">Cấp quyền hiển thị trên ứng dụng khác</string>
     <string name="btn_start_service">Khởi chạy dịch vụ dịch</string>
+    <string name="btn_stop_service">Dừng dịch vụ dịch</string>
     <string name="btn_reverify_model">Kiểm tra lại gói dịch Offline</string>
     <string name="btn_check_update">Kiểm tra bản cập nhật</string>
     <string name="btn_checking_update">Đang kiểm tra cập nhật…</string>
