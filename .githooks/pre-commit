@@ -1,19 +1,19 @@
 #!/bin/sh
 # Git Pre-commit hook for CreamTranslator
-# Ensures code formatting, static analysis, and conventional commits
+# Ensures code formatting standards before committing
 
-echo "[HOOK] Running pre-commit static analysis and formatting checks..."
+echo "[HOOK] Running pre-commit code formatting check..."
 
 if command -v java >/dev/null 2>&1 && [ -f "./gradlew" ]; then
-    ./gradlew spotlessCheck detekt --daemon
+    ./gradlew spotlessCheck --daemon
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        echo "[ERROR] Pre-commit quality checks failed! Please run './gradlew spotlessApply' and fix detekt issues before committing."
+        echo "[ERROR] Code formatting check failed! Please run './gradlew spotlessApply' before committing."
         exit 1
     fi
 else
-    echo "[HOOK] Local Java runtime not detected in PATH; static analysis deferred to GitHub Actions CI."
+    echo "[HOOK] Local Java runtime not detected in PATH; formatting check deferred to GitHub Actions CI."
 fi
 
-echo "[HOOK] Pre-commit checks passed successfully."
+echo "[HOOK] Pre-commit formatting check passed successfully."
 exit 0

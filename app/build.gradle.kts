@@ -3,10 +3,12 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-val baseVersion = "1.0"
-val envBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
-val appVersionCode = envBuildNumber ?: 1
-val appVersionName = if (envBuildNumber != null) "$baseVersion.$envBuildNumber" else "$baseVersion.0"
+val major = providers.gradleProperty("appVersionMajor").getOrElse("1").toInt()
+val minor = providers.gradleProperty("appVersionMinor").getOrElse("0").toInt()
+val buildNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull() ?: 0
+
+val appVersionCode = (major * 10000) + (minor * 1000) + buildNumber
+val appVersionName = "$major.$minor.$buildNumber"
 
 android {
     namespace = "com.cream.translator"
@@ -91,4 +93,11 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+tasks.register("printAppVersion") {
+    doLast {
+        println("APP_VERSION_NAME=$appVersionName")
+        println("APP_VERSION_CODE=$appVersionCode")
+    }
 }
