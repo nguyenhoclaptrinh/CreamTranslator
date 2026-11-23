@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.cream.translator.BuildConfig
 import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.model.LanguagePair
@@ -170,7 +171,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun lifecycleScopeLaunch(block: suspend () -> Unit) {
-        kotlinx.coroutines.MainScope().launch {
+        lifecycleScope.launch {
             block()
         }
     }

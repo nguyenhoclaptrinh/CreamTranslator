@@ -92,22 +92,46 @@ class UpdateEngine(
             emit(DownloadState.Progress(0L, 0L, 0))
             destinationFile.parentFile?.mkdirs()
 
+            val tempFile = File(destinationFile.parentFile, "${destinationFile.name}.tmp")
             var connection: HttpURLConnection? = null
+
             try {
                 connection = resolveRedirectConnection(downloadUrl)
                 if (connection == null) {
-                    emit(DownloadState.Error("Too many redirects or failed connection"))
+                    emit(DownloadState.Error("Không thể thiết lập kết nối tải an toàn (chuyển hướng thất bại)"))
                     return@flow
                 }
 
                 val totalBytes = connection.contentLengthLong
 
                 connection.inputStream.use { input ->
-                    FileOutputStream(destinationFile).use { output ->
+                    FileOutputStream(tempFile).use { output ->
                         writeStreamWithProgress(input, output, totalBytes) { downloaded, percent ->
                             emit(DownloadState.Progress(downloaded, totalBytes, percent))
                         }
                     }
+                }
+
+                // Invariant: Data integrity check to prevent executing truncated/corrupt APKs
+                if (totalBytes > 0 && tempFile.length() != totalBytes) {
+                    val actualLength = tempFile.length()
+                    tempFile.delete()
+                    emit(
+                        DownloadState.Error(
+                            "Tệp tải về không đầy đủ (nhận $actualLength/$totalBytes bytes)",
+                        ),
+                    )
+                    return@flow
+                }
+
+                if (destinationFile.exists()) {
+                    destinationFile.delete()
+                }
+
+                if (!tempFile.renameTo(destinationFile)) {
+                    tempFile.delete()
+                    emit(DownloadState.Error("Không thể hoàn tất lưu tệp cập nhật"))
+                    return@flow
                 }
 
                 emit(DownloadState.Completed(destinationFile))
@@ -115,6 +139,9 @@ class UpdateEngine(
                 Timber.e(e, "Exception during APK download")
                 emit(DownloadState.Error(e.message ?: "Lỗi tải tệp cài đặt"))
             } finally {
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
                 connection?.disconnect()
             }
         }.flowOn(Dispatchers.IO)
@@ -131,14 +158,27 @@ class UpdateEngine(
                     setRequestProperty("User-Agent", "CreamTranslator-Android")
                     instanceFollowRedirects = false
                 }
+
             val code = conn.responseCode
-            if (code == HttpURLConnection.HTTP_MOVED_PERM ||
-                code == HttpURLConnection.HTTP_MOVED_TEMP ||
-                code == HTTP_SEE_OTHER
-            ) {
-                currentUrl = conn.getHeaderField("Location")
-                conn.disconnect()
-                redirects++
+            val isRedirect =
+                code == HttpURLConnection.HTTP_MOVED_PERM ||
+                    code == HttpURLConnection.HTTP_MOVED_TEMP ||
+                    code == HTTP_SEE_OTHER ||
+                    code == HTTP_TEMP_REDIRECT ||
+                    code == HTTP_PERM_REDIRECT
+
+            if (isRedirect) {
+                val location = conn.getHeaderField("Location")
+                // Enforce HTTPS security: block insecure cleartext downgrade attacks
+                if (location != null && location.startsWith("https://", ignoreCase = true)) {
+                    currentUrl = location
+                    conn.disconnect()
+                    redirects++
+                } else {
+                    Timber.w("Blocked non-HTTPS or missing redirect location: $location")
+                    conn.disconnect()
+                    return null
+                }
             } else if (code == HttpURLConnection.HTTP_OK) {
                 return conn
             } else {
@@ -181,8 +221,12 @@ class UpdateEngine(
         remoteVersion: String,
         currentVersion: String,
     ): Boolean {
-        val remoteParts = remoteVersion.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = currentVersion.split(".").mapNotNull { it.toIntOrNull() }
+        // Strip pre-release and build metadata (e.g., "1.0.1-beta.1+build20" -> "1.0.1")
+        val cleanRemote = remoteVersion.substringBefore("-").substringBefore("+")
+        val cleanCurrent = currentVersion.substringBefore("-").substringBefore("+")
+
+        val remoteParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
+        val currentParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
 
         val maxLen = maxOf(remoteParts.size, currentParts.size)
         for (i in 0 until maxLen) {
@@ -199,5 +243,7 @@ class UpdateEngine(
         private const val BUFFER_SIZE = 8192
         private const val MAX_REDIRECTS = 5
         private const val HTTP_SEE_OTHER = 303
+        private const val HTTP_TEMP_REDIRECT = 307
+        private const val HTTP_PERM_REDIRECT = 308
     }
 }
