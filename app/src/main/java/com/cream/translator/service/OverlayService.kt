@@ -308,10 +308,19 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT,
-            )
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = 0
+                y = 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
 
         val overlayView =
             InPlaceTranslationOverlay(this).apply {
@@ -343,6 +352,28 @@ class OverlayService : Service() {
             isOverlayShowing = false
             _state.value = TranslationState.Idle
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (isOverlayShowing) {
+            dismissTranslationOverlay()
+        }
+        floatingTriggerView?.let { trigger ->
+            triggerParams?.let { params ->
+                val displayMetrics = resources.displayMetrics
+                val maxX = displayMetrics.widthPixels - params.width
+                val maxY = displayMetrics.heightPixels - params.height
+                params.x = params.x.coerceIn(0, maxOf(0, maxX))
+                params.y = params.y.coerceIn(0, maxOf(0, maxY))
+                try {
+                    windowManager?.updateViewLayout(trigger, params)
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to update trigger layout on configuration change")
+                }
+            }
+        }
+        Timber.d("OverlayService configuration changed and views adjusted")
     }
 
     override fun onDestroy() {

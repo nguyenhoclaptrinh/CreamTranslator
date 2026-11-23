@@ -61,6 +61,31 @@ class ScreenCaptureManager(
         screenDensity = metrics.densityDpi
     }
 
+    private fun checkAndSyncDimensions() {
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        val isDimensionChanged =
+            metrics.widthPixels != screenWidth ||
+                metrics.heightPixels != screenHeight ||
+                metrics.densityDpi != screenDensity
+        if (isDimensionChanged) {
+            Timber.i(
+                "Display configuration change detected: %dx%d -> %dx%d (%ddpi)",
+                screenWidth,
+                screenHeight,
+                metrics.widthPixels,
+                metrics.heightPixels,
+                metrics.densityDpi,
+            )
+            screenWidth = metrics.widthPixels
+            screenHeight = metrics.heightPixels
+            screenDensity = metrics.densityDpi
+            setupVirtualDisplay()
+        }
+    }
+
     @SuppressLint("WrongConstant")
     private fun setupVirtualDisplay() {
         imageReader?.close()
@@ -89,6 +114,7 @@ class ScreenCaptureManager(
 
     suspend fun captureFrame(): Bitmap? =
         withContext(Dispatchers.Default) {
+            checkAndSyncDimensions()
             val reader = imageReader ?: return@withContext null
             var image: Image? = null
             var rawBitmap: Bitmap? = null

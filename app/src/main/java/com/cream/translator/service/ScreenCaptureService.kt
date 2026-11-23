@@ -113,6 +113,12 @@ class ScreenCaptureService : Service() {
         return captureManager?.captureFrame()
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        captureManager?.onConfigurationChanged()
+        Timber.d("ScreenCaptureService configuration changed")
+    }
+
     override fun onDestroy() {
         instance = null
         captureManager?.release()
