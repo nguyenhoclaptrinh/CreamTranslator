@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
@@ -20,18 +21,34 @@ import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.engine.TextInpainter
 import com.cream.translator.core.model.LanguagePair
 import com.cream.translator.core.model.TranslationResult
+import com.cream.translator.core.model.TranslationState
+import com.cream.translator.core.model.error.CreamError
+import com.cream.translator.core.util.createNamedExceptionHandler
 import com.cream.translator.ui.overlay.InPlaceTranslationOverlay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 class OverlayService : Service() {
-    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val exceptionHandler =
+        createNamedExceptionHandler("OverlayService") { throwable ->
+            _state.value =
+                TranslationState.Error(
+                    error = CreamError.OverlayError.WindowAttachmentFailed(throwable),
+                )
+            floatingTriggerView?.visibility = View.VISIBLE
+        }
+
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob() + exceptionHandler)
     private var windowManager: WindowManager? = null
 
     private var floatingTriggerView: View? = null
@@ -42,18 +59,22 @@ class OverlayService : Service() {
 
     private val ocrEngine = MlKitOcrEngine()
     private val translationEngine = MlKitTranslationEngine()
-    private var isProcessing = false
+
+    private val _state = MutableStateFlow<TranslationState>(TranslationState.Idle)
+    val state: StateFlow<TranslationState> = _state.asStateFlow()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         setupFloatingTrigger()
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupFloatingTrigger() {
+        val wm = windowManager ?: return
+
         val layoutType =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -98,13 +119,13 @@ class OverlayService : Service() {
 
         attachDragAndClickListener(triggerButton, triggerParams!!)
 
-        try {
-            windowManager?.addView(triggerButton, triggerParams)
+        val attached = wm.safeAddView(triggerButton, triggerParams!!)
+        if (attached) {
             floatingTriggerView = triggerButton
             Timber.d("Floating trigger attached successfully")
             Toast.makeText(this, "CreamTranslator: Đã kích hoạt nút dịch nổi (CT)", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to attach floating overlay view")
+        } else {
+            Timber.e("Failed to attach floating overlay view")
         }
     }
 
@@ -136,7 +157,7 @@ class OverlayService : Service() {
                     }
                     params.x = initialX + dx
                     params.y = initialY + dy
-                    windowManager?.updateViewLayout(view, params)
+                    windowManager?.safeUpdateViewLayout(view, params)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
@@ -156,12 +177,13 @@ class OverlayService : Service() {
             return
         }
 
-        if (isProcessing) {
+        val currentState = _state.value
+        if (currentState is TranslationState.Capturing || currentState is TranslationState.Processing) {
             Toast.makeText(this, "Đang xử lý, vui lòng chờ...", Toast.LENGTH_SHORT).show()
             return
         }
 
-        isProcessing = true
+        _state.value = TranslationState.Capturing
         serviceScope.launch {
             try {
                 // 1. Ẩn nút nổi tạm thời để không bị dính vào ảnh chụp màn hình
@@ -171,13 +193,9 @@ class OverlayService : Service() {
                 // 2. Chụp khung hình màn hình hiện tại
                 val captureService = ScreenCaptureService.instance
                 if (captureService == null) {
-                    Toast.makeText(
-                        this@OverlayService,
-                        "Dịch vụ chụp màn hình chưa sẵn sàng",
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    floatingTriggerView?.visibility = View.VISIBLE
-                    isProcessing = false
+                    val err = CreamError.CaptureError.PermissionDenied()
+                    _state.value = TranslationState.Error(err)
+                    Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
                     return@launch
                 }
 
@@ -185,18 +203,20 @@ class OverlayService : Service() {
                 floatingTriggerView?.visibility = View.VISIBLE
 
                 if (bitmap == null) {
-                    Toast.makeText(
-                        this@OverlayService,
-                        "Không thể chụp màn hình (hoặc màn hình được bảo mật)",
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    isProcessing = false
+                    val err = CreamError.CaptureError.FrameAcquireTimeout()
+                    _state.value = TranslationState.Error(err)
+                    Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
                     return@launch
                 }
 
                 val results =
                     try {
-                        Toast.makeText(this@OverlayService, "Đang nhận diện văn bản...", Toast.LENGTH_SHORT).show()
+                        _state.value = TranslationState.Processing("OCR")
+                        Toast.makeText(
+                            this@OverlayService,
+                            "Đang nhận diện văn bản...",
+                            Toast.LENGTH_SHORT,
+                        ).show()
 
                         // 3. Chạy OCR On-Device bằng ML Kit
                         val textRegions =
@@ -205,15 +225,13 @@ class OverlayService : Service() {
                             }
 
                         if (textRegions.isEmpty()) {
-                            Toast.makeText(
-                                this@OverlayService,
-                                "Không tìm thấy chữ trên màn hình",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                            isProcessing = false
+                            val err = CreamError.OcrError.ZeroRegionsDetected()
+                            _state.value = TranslationState.Error(err)
+                            Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
                             return@launch
                         }
 
+                        _state.value = TranslationState.Processing("Translate")
                         Toast.makeText(
                             this@OverlayService,
                             "Đang dịch ${textRegions.size} khối chữ...",
@@ -249,13 +267,21 @@ class OverlayService : Service() {
                     }
 
                 // 5. Hiển thị lớp phủ dịch đè trực tiếp (In-Place Translation Overlay)
+                _state.value = TranslationState.Success(results)
                 displayTranslationOverlay(results)
-            } catch (e: Exception) {
+            } catch (cancellation: CancellationException) {
+                _state.value = TranslationState.Idle
+                throw cancellation
+            } catch (e: Throwable) {
                 Timber.e(e, "Lỗi trong quá trình dịch màn hình")
+                val err = CreamError.TranslationError.InferenceFailed(e)
+                _state.value = TranslationState.Error(err)
                 Toast.makeText(this@OverlayService, "Lỗi xử lý: ${e.message}", Toast.LENGTH_SHORT).show()
             } finally {
                 floatingTriggerView?.visibility = View.VISIBLE
-                isProcessing = false
+                if (_state.value is TranslationState.Capturing || _state.value is TranslationState.Processing) {
+                    _state.value = TranslationState.Idle
+                }
             }
         }
     }
@@ -264,6 +290,8 @@ class OverlayService : Service() {
         if (isOverlayShowing) {
             dismissTranslationOverlay()
         }
+
+        val wm = windowManager ?: return
 
         val layoutType =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -292,37 +320,34 @@ class OverlayService : Service() {
                 }
             }
 
-        try {
-            windowManager?.addView(overlayView, overlayParams)
+        val added = wm.safeAddView(overlayView, overlayParams)
+        if (added) {
             inPlaceOverlay = overlayView
             isOverlayShowing = true
-            Toast.makeText(this, "Chạm vào chữ để đổi bản gốc/dịch. Chạm ra ngoài để đóng.", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            Timber.e(e, "Không thể gắn lớp phủ dịch đè lên màn hình")
+            Toast.makeText(
+                this,
+                "Chạm vào chữ để đổi bản gốc/dịch. Chạm ra ngoài để đóng.",
+                Toast.LENGTH_LONG,
+            ).show()
+        } else {
+            Timber.e("Không thể gắn lớp phủ dịch đè lên màn hình")
+            _state.value = TranslationState.Error(CreamError.OverlayError.WindowAttachmentFailed())
         }
     }
 
     private fun dismissTranslationOverlay() {
         if (isOverlayShowing && inPlaceOverlay != null) {
-            try {
-                windowManager?.removeView(inPlaceOverlay)
-            } catch (e: Exception) {
-                Timber.e(e, "Lỗi khi gỡ lớp phủ dịch")
-            } finally {
-                inPlaceOverlay = null
-                isOverlayShowing = false
-            }
+            windowManager?.safeRemoveView(inPlaceOverlay)
+            inPlaceOverlay = null
+            isOverlayShowing = false
+            _state.value = TranslationState.Idle
         }
     }
 
     override fun onDestroy() {
         dismissTranslationOverlay()
         if (floatingTriggerView != null) {
-            try {
-                windowManager?.removeView(floatingTriggerView)
-            } catch (e: Exception) {
-                Timber.e(e, "Error removing floating view on destroy")
-            }
+            windowManager?.safeRemoveView(floatingTriggerView)
             floatingTriggerView = null
         }
         ocrEngine.close()
@@ -331,4 +356,45 @@ class OverlayService : Service() {
         super.onDestroy()
         Timber.d("OverlayService destroyed")
     }
+
+    private fun WindowManager.safeAddView(
+        view: View,
+        params: ViewGroup.LayoutParams,
+    ): Boolean =
+        try {
+            addView(view, params)
+            true
+        } catch (e: Throwable) {
+            Timber.e(e, "safeAddView failed")
+            false
+        }
+
+    private fun WindowManager.safeRemoveView(view: View?): Boolean =
+        try {
+            if (view != null && (view.isAttachedToWindow || view.windowToken != null)) {
+                removeView(view)
+                true
+            } else {
+                false
+            }
+        } catch (e: Throwable) {
+            Timber.e(e, "safeRemoveView failed")
+            false
+        }
+
+    private fun WindowManager.safeUpdateViewLayout(
+        view: View,
+        params: ViewGroup.LayoutParams,
+    ): Boolean =
+        try {
+            if (view.isAttachedToWindow || view.windowToken != null) {
+                updateViewLayout(view, params)
+                true
+            } else {
+                false
+            }
+        } catch (e: Throwable) {
+            Timber.e(e, "safeUpdateViewLayout failed")
+            false
+        }
 }

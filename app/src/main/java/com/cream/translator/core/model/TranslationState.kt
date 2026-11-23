@@ -1,5 +1,7 @@
 package com.cream.translator.core.model
 
+import com.cream.translator.core.model.error.CreamError
+
 sealed interface TranslationState {
     data object Idle : TranslationState
 
@@ -9,5 +11,9 @@ sealed interface TranslationState {
 
     data class Success(val results: List<TranslationResult>) : TranslationState
 
-    data class Error(val message: String, val isRecoverable: Boolean = true) : TranslationState
+    data class Error(
+        val error: CreamError,
+        val message: String = error.userFriendlyMessage,
+        val isRecoverable: Boolean = error.isRecoverable,
+    ) : TranslationState
 }

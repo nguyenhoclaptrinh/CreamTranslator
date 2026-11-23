@@ -360,7 +360,9 @@ private fun UpdateHandler(
             AlertDialog(
                 onDismissRequest = onDismiss,
                 title = { Text("Tải hoàn tất") },
-                text = { Text("Tệp cài đặt đã sẵn sàng. Chạm tiếp tục để cài đặt cập nhật.") },
+                text = {
+                    Text("Tệp cài đặt đã sẵn sàng. Chạm tiếp tục để cài đặt cập nhật.")
+                },
                 confirmButton = {
                     Button(onClick = { onInstall(updateState.apkFile) }) {
                         Text("Cài đặt ngay")
