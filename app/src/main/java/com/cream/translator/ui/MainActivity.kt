@@ -11,42 +11,77 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cream.translator.BuildConfig
 import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.model.LanguagePair
 import com.cream.translator.service.OverlayService
 import com.cream.translator.service.ScreenCaptureService
+import com.cream.translator.update.UpdateInstaller
+import com.cream.translator.update.UpdateUiState
+import com.cream.translator.update.UpdateViewModel
+import com.cream.translator.update.model.AppReleaseInfo
 import kotlinx.coroutines.launch
+import java.io.File
+
+data class DashboardActions(
+    val onRequestOverlayPermission: () -> Unit,
+    val onStartService: () -> Unit,
+    val onCheckUpdate: () -> Unit,
+    val onStartDownload: (AppReleaseInfo) -> Unit,
+    val onDismissUpdateDialog: () -> Unit,
+    val onInstallApk: (File) -> Unit,
+    val onDownloadModel: (LanguagePair, (Boolean) -> Unit) -> Unit,
+)
 
 class MainActivity : ComponentActivity() {
     private val translationEngine = MlKitTranslationEngine()
+    private val updateViewModel: UpdateViewModel by viewModels()
 
     private val overlayPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
         ) {
             checkPermissions()
+        }
+
+    private val installPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            // Re-check after user returns from settings
         }
 
     private val screenCaptureLauncher =
@@ -76,20 +111,43 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
+                    val updateState by updateViewModel.uiState.collectAsState()
+                    val actions =
+                        DashboardActions(
+                            onRequestOverlayPermission = { requestOverlayPermission() },
+                            onStartService = { startScreenCapture() },
+                            onCheckUpdate = { updateViewModel.checkForUpdate() },
+                            onStartDownload = { release -> updateViewModel.startDownload(release) },
+                            onDismissUpdateDialog = { updateViewModel.dismissDialog() },
+                            onInstallApk = { apkFile -> triggerApkInstall(apkFile) },
+                            onDownloadModel = { pair, onComplete ->
+                                lifecycleScopeLaunch {
+                                    val success = translationEngine.ensureModelDownloaded(pair)
+                                    onComplete(success)
+                                }
+                            },
+                        )
+
                     TranslatorDashboard(
                         hasOverlayPermission = hasOverlayPermission,
-                        onRequestOverlayPermission = { requestOverlayPermission() },
-                        onStartService = { startScreenCapture() },
-                        onDownloadModel = { pair, onComplete ->
-                            // Trigger offline model pack download once
-                            lifecycleScopeLaunch {
-                                val success = translationEngine.ensureModelDownloaded(pair)
-                                onComplete(success)
-                            }
-                        },
+                        updateState = updateState,
+                        actions = actions,
                     )
                 }
             }
+        }
+    }
+
+    private fun triggerApkInstall(apkFile: File) {
+        if (!UpdateInstaller.canRequestPackageInstalls(this)) {
+            Toast.makeText(
+                this,
+                "Vui lòng cấp quyền Cài đặt ứng dụng không rõ nguồn",
+                Toast.LENGTH_LONG,
+            ).show()
+            installPermissionLauncher.launch(UpdateInstaller.createManageUnknownSourcesIntent(this))
+        } else {
+            UpdateInstaller.installApk(this, apkFile)
         }
     }
 
@@ -126,16 +184,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun TranslatorDashboard(
     hasOverlayPermission: Boolean,
-    onRequestOverlayPermission: () -> Unit,
-    onStartService: () -> Unit,
-    onDownloadModel: (LanguagePair, (Boolean) -> Unit) -> Unit,
+    updateState: UpdateUiState,
+    actions: DashboardActions,
 ) {
     var isModelReady by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         isDownloading = true
-        onDownloadModel(LanguagePair("en", "vi")) { success ->
+        actions.onDownloadModel(LanguagePair("en", "vi")) { success ->
             isModelReady = success
             isDownloading = false
         }
@@ -145,6 +202,7 @@ fun TranslatorDashboard(
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -167,6 +225,7 @@ fun TranslatorDashboard(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "• App Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
                 Text(text = "• Overlay Permission: ${if (hasOverlayPermission) "Granted" else "Missing"}")
                 Text(
                     text = "• Offline EN-VI Model: ${if (isModelReady) {
@@ -183,14 +242,14 @@ fun TranslatorDashboard(
 
         if (!hasOverlayPermission) {
             Button(
-                onClick = onRequestOverlayPermission,
+                onClick = actions.onRequestOverlayPermission,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Grant Overlay Permission")
             }
         } else {
             Button(
-                onClick = onStartService,
+                onClick = actions.onStartService,
                 enabled = isModelReady,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -201,7 +260,7 @@ fun TranslatorDashboard(
         OutlinedButton(
             onClick = {
                 isDownloading = true
-                onDownloadModel(LanguagePair("en", "vi")) { success ->
+                actions.onDownloadModel(LanguagePair("en", "vi")) { success ->
                     isModelReady = success
                     isDownloading = false
                 }
@@ -210,5 +269,136 @@ fun TranslatorDashboard(
         ) {
             Text("Re-verify Offline Model")
         }
+
+        OutlinedButton(
+            onClick = actions.onCheckUpdate,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (updateState is UpdateUiState.Checking) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text("Đang kiểm tra cập nhật...")
+                } else {
+                    Text("Kiểm tra bản cập nhật")
+                }
+            }
+        }
+
+        UpdateHandler(
+            updateState = updateState,
+            onStartDownload = actions.onStartDownload,
+            onDismiss = actions.onDismissUpdateDialog,
+            onInstall = actions.onInstallApk,
+        )
+    }
+}
+
+@Composable
+private fun UpdateHandler(
+    updateState: UpdateUiState,
+    onStartDownload: (AppReleaseInfo) -> Unit,
+    onDismiss: () -> Unit,
+    onInstall: (File) -> Unit,
+) {
+    when (updateState) {
+        is UpdateUiState.UpdateAvailable -> {
+            val release = updateState.releaseInfo
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Bản cập nhật mới: ${release.tagName}") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Dung lượng: ${release.apkSize / (1024 * 1024)} MB")
+                        Text("Ghi chú phát hành:")
+                        Text(
+                            text = release.releaseNotes,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { onStartDownload(release) }) {
+                        Text("Tải và cài đặt")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("Để sau")
+                    }
+                },
+            )
+        }
+
+        is UpdateUiState.Downloading -> {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Đang tải bản cập nhật...") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LinearProgressIndicator(
+                            progress = { updateState.progressPercent / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = "Tiến độ: ${updateState.progressPercent}%",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                },
+                confirmButton = {},
+            )
+        }
+
+        is UpdateUiState.ReadyToInstall -> {
+            LaunchedEffect(updateState.apkFile) {
+                onInstall(updateState.apkFile)
+            }
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Tải hoàn tất") },
+                text = { Text("Tệp cài đặt đã sẵn sàng. Chạm tiếp tục để cài đặt cập nhật.") },
+                confirmButton = {
+                    Button(onClick = { onInstall(updateState.apkFile) }) {
+                        Text("Cài đặt ngay")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("Đóng")
+                    }
+                },
+            )
+        }
+
+        is UpdateUiState.NoUpdateAvailable -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Thông báo cập nhật") },
+                text = { Text("Bạn đang sử dụng phiên bản mới nhất (v${updateState.currentVersion}).") },
+                confirmButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("Đã hiểu")
+                    }
+                },
+            )
+        }
+
+        is UpdateUiState.Error -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Lỗi cập nhật") },
+                text = { Text(updateState.message) },
+                confirmButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("Đóng")
+                    }
+                },
+            )
+        }
+
+        else -> Unit
     }
 }

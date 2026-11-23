@@ -5,6 +5,8 @@ build:
 complexity:
   TooManyFunctions:
     active: false
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
   LongMethod:
     threshold: 120
   ComplexCondition:
