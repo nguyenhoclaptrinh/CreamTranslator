@@ -30,7 +30,17 @@ Once the service starts, a small circular pill docks cleanly to the edge of your
 
 ---
 
-## 3. Product Support & Lifecycle Policy
+## 3. In-App Online Updates (One-Tap OTA)
+
+CreamTranslator includes a built-in self-updater connected directly to official releases:
+1. Open the app and tap **"Kiểm tra bản cập nhật" (Check for Updates)**.
+2. If a new version is released, the app displays the release notes and new version number.
+3. Tap **"Tải và cài đặt" (Download & Install)**. The app streams the APK in the background with a live progress indicator.
+4. When download completes, Android's system package installer opens automatically. Tap **"Cập nhật" (Update)** to finish.
+
+---
+
+## 4. Product Support & Lifecycle Policy
 
 - **No Subscriptions / No Ads:** Your purchase grants perpetual use with zero ongoing fees.
 - **Android OS Updates:** When major Android platform updates occur (e.g., Android 15, Android 16), compatibility maintenance updates will be supplied without additional charges.
