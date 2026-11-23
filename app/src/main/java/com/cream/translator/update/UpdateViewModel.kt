@@ -65,11 +65,17 @@ class UpdateViewModel(
 
     fun startDownload(releaseInfo: AppReleaseInfo) {
         viewModelScope.launch {
-            val destinationFile =
-                File(
-                    getApplication<Application>().cacheDir,
-                    "updates/CreamTranslator-${releaseInfo.tagName}.apk",
-                )
+            // Cache Hygiene: purge legacy cached APK and temporary files before downloading new version
+            val updateDir = File(getApplication<Application>().cacheDir, "updates")
+            if (updateDir.exists()) {
+                updateDir.listFiles()?.forEach { file ->
+                    if (file.isFile && (file.name.endsWith(".apk") || file.name.endsWith(".tmp"))) {
+                        file.delete()
+                    }
+                }
+            }
+
+            val destinationFile = File(updateDir, "CreamTranslator-${releaseInfo.tagName}.apk")
 
             engine.downloadApk(releaseInfo.downloadUrl, destinationFile).collect { state ->
                 when (state) {

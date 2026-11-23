@@ -1,14 +1,22 @@
-name: Android CI & Quality Gate
+name: Android CI
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
 
 jobs:
   validate:
@@ -24,26 +32,42 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Mount RAM Disk for Build Cache
+        run: |
+          sudo mkdir -p app/build
+          sudo mount -t tmpfs -o size=2048m tmpfs app/build
 
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew || true
+        run: chmod +x gradlew
 
-      - name: Code Formatting Check (Spotless / Ktlint)
-        run: ./gradlew spotlessCheck --continue || true
+      - name: Run Quality Gate and Unit Tests
+        run: ./gradlew spotlessCheck detekt lintDebug testDebugUnitTest --continue
 
-      - name: Static Analysis (Detekt)
-        run: ./gradlew detekt || true
+      - name: Publish Test Report to PR
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Test Results
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          reporter: java-junit
 
-      - name: Android Lint
-        run: ./gradlew lintDebug || true
-
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --continue || true
+      - name: Upload Diagnostic Reports on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-and-lint-reports
+          path: |
+            app/build/reports/
+            build/reports/
+          retention-days: 7
+          if-no-files-found: ignore
 
   build-apk:
     name: Build Assemble Debug APK
-    needs: validate
     runs-on: ubuntu-latest
 
     steps:
@@ -55,13 +79,20 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Mount RAM Disk for Build Output
+        run: |
+          sudo mkdir -p app/build
+          sudo mount -t tmpfs -o size=2048m tmpfs app/build
 
       - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Assemble Debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug -x test -x lint
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4

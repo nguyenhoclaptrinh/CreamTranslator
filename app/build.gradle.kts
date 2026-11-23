@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+val major = providers.gradleProperty("appVersionMajor").getOrElse("1").toInt()
+val minor = providers.gradleProperty("appVersionMinor").getOrElse("0").toInt()
+val buildNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull() ?: 0
+
+val appVersionCode = (major * 10000) + (minor * 1000) + buildNumber
+val appVersionName = "$major.$minor.$buildNumber"
+
 android {
     namespace = "com.cream.translator"
     compileSdk = 34
@@ -11,8 +18,8 @@ android {
         applicationId = "com.cream.translator"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -59,6 +66,18 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
+    lint {
+        checkDependencies = false
+        checkReleaseBuilds = false
+        abortOnError = true
+        htmlReport = true
+        xmlReport = true
+    }
 }
 
 dependencies {
@@ -86,4 +105,11 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+tasks.register("printAppVersion") {
+    doLast {
+        println("APP_VERSION_NAME=$appVersionName")
+        println("APP_VERSION_CODE=$appVersionCode")
+    }
 }

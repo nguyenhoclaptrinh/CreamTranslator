@@ -194,49 +194,58 @@ class OverlayService : Service() {
                     return@launch
                 }
 
-                Toast.makeText(this@OverlayService, "Đang nhận diện văn bản...", Toast.LENGTH_SHORT).show()
-
-                // 3. Chạy OCR On-Device bằng ML Kit
-                val textRegions =
-                    withContext(Dispatchers.Default) {
-                        ocrEngine.recognizeText(bitmap)
-                    }
-
-                if (textRegions.isEmpty()) {
-                    Toast.makeText(this@OverlayService, "Không tìm thấy chữ trên màn hình", Toast.LENGTH_SHORT).show()
-                    isProcessing = false
-                    return@launch
-                }
-
-                Toast.makeText(
-                    this@OverlayService,
-                    "Đang dịch ${textRegions.size} khối chữ...",
-                    Toast.LENGTH_SHORT,
-                ).show()
-
-                // 4. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
                 val results =
-                    withContext(Dispatchers.Default) {
-                        val textsToTranslate = textRegions.map { it.originalText }
-                        val translatedTexts =
-                            translationEngine.translateBatch(
-                                textsToTranslate,
-                                LanguagePair("en", "vi"),
-                            )
+                    try {
+                        Toast.makeText(this@OverlayService, "Đang nhận diện văn bản...", Toast.LENGTH_SHORT).show()
 
-                        textRegions.mapIndexed { index, region ->
-                            val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
-                            val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
-                            val enrichedRegion =
-                                region.copy(
-                                    backgroundColor = sampledBg,
-                                    textColor = contrastingText,
-                                )
-                            TranslationResult(
-                                region = enrichedRegion,
-                                translatedText = translatedTexts.getOrElse(index) { region.originalText },
-                            )
+                        // 3. Chạy OCR On-Device bằng ML Kit
+                        val textRegions =
+                            withContext(Dispatchers.Default) {
+                                ocrEngine.recognizeText(bitmap)
+                            }
+
+                        if (textRegions.isEmpty()) {
+                            Toast.makeText(
+                                this@OverlayService,
+                                "Không tìm thấy chữ trên màn hình",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            isProcessing = false
+                            return@launch
                         }
+
+                        Toast.makeText(
+                            this@OverlayService,
+                            "Đang dịch ${textRegions.size} khối chữ...",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+
+                        // 4. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
+                        withContext(Dispatchers.Default) {
+                            val textsToTranslate = textRegions.map { it.originalText }
+                            val translatedTexts =
+                                translationEngine.translateBatch(
+                                    textsToTranslate,
+                                    LanguagePair("en", "vi"),
+                                )
+
+                            textRegions.mapIndexed { index, region ->
+                                val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
+                                val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
+                                val enrichedRegion =
+                                    region.copy(
+                                        backgroundColor = sampledBg,
+                                        textColor = contrastingText,
+                                    )
+                                TranslationResult(
+                                    region = enrichedRegion,
+                                    translatedText = translatedTexts.getOrElse(index) { region.originalText },
+                                )
+                            }
+                        }
+                    } finally {
+                        // Prevent native graphic memory leaks by immediately recycling full-frame capture
+                        bitmap.recycle()
                     }
 
                 // 5. Hiển thị lớp phủ dịch đè trực tiếp (In-Place Translation Overlay)

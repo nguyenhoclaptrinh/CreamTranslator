@@ -50,4 +50,13 @@ class UpdateEngineTest {
         assertTrue(engine.isNewerVersion("1.0.0.1", "1.0.0"))
         assertFalse(engine.isNewerVersion("1.0.0", "1.0.0.1"))
     }
+
+    @Test
+    fun `isNewerVersion handles pre-release tags and build metadata correctly`() {
+        assertTrue(engine.isNewerVersion("1.0.1-beta", "1.0.0"))
+        assertTrue(engine.isNewerVersion("1.1.0-rc.1", "1.0.9"))
+        assertTrue(engine.isNewerVersion("1.0.1+build20", "1.0.0"))
+        assertFalse(engine.isNewerVersion("1.0.0-beta", "1.0.0"))
+        assertFalse(engine.isNewerVersion("1.0.0-rc1", "1.0.1"))
+    }
 }
