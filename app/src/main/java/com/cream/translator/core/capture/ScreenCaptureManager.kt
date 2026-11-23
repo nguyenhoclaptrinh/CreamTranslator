@@ -24,6 +24,7 @@ class ScreenCaptureManager(
     private val context: Context,
     private val mediaProjection: MediaProjection,
 ) {
+    private val displayLock = Any()
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var screenDensity: Int = DisplayMetrics.DENSITY_DEFAULT
@@ -85,34 +86,71 @@ class ScreenCaptureManager(
             screenWidth = metrics.widthPixels
             screenHeight = metrics.heightPixels
             screenDensity = metrics.densityDpi
-            setupVirtualDisplay()
+            resizeVirtualDisplay()
         }
     }
 
     @SuppressLint("WrongConstant")
     private fun setupVirtualDisplay() {
-        imageReader?.close()
-        imageReader =
-            ImageReader.newInstance(
-                screenWidth,
-                screenHeight,
-                PixelFormat.RGBA_8888,
-                2,
-            )
+        synchronized(displayLock) {
+            if (virtualDisplay != null) {
+                resizeVirtualDisplay()
+                return
+            }
+            try {
+                imageReader?.close()
+                imageReader =
+                    ImageReader.newInstance(
+                        screenWidth,
+                        screenHeight,
+                        PixelFormat.RGBA_8888,
+                        2,
+                    )
 
-        virtualDisplay?.release()
-        virtualDisplay =
-            mediaProjection.createVirtualDisplay(
-                "ScreenCaptureVirtualDisplay",
-                screenWidth,
-                screenHeight,
-                screenDensity,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
-                null,
-                null,
-            )
-        Timber.d("VirtualDisplay initialized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
+                virtualDisplay =
+                    mediaProjection.createVirtualDisplay(
+                        "ScreenCaptureVirtualDisplay",
+                        screenWidth,
+                        screenHeight,
+                        screenDensity,
+                        DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                        imageReader?.surface,
+                        null,
+                        null,
+                    )
+                Timber.d("VirtualDisplay initialized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to initialize VirtualDisplay")
+            }
+        }
+    }
+
+    @SuppressLint("WrongConstant")
+    private fun resizeVirtualDisplay() {
+        synchronized(displayLock) {
+            val currentDisplay =
+                virtualDisplay ?: run {
+                    setupVirtualDisplay()
+                    return
+                }
+            try {
+                val oldReader = imageReader
+                val newReader =
+                    ImageReader.newInstance(
+                        screenWidth,
+                        screenHeight,
+                        PixelFormat.RGBA_8888,
+                        2,
+                    )
+                imageReader = newReader
+                currentDisplay.resize(screenWidth, screenHeight, screenDensity)
+                currentDisplay.surface = newReader.surface
+                oldReader?.close()
+                Timber.i("VirtualDisplay resized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
+            } catch (e: Exception) {
+                Timber.e(e, "Error resizing VirtualDisplay")
+            }
+        }
     }
 
     suspend fun captureFrame(): Bitmap? =
@@ -172,24 +210,26 @@ class ScreenCaptureManager(
 
     fun onConfigurationChanged() {
         updateScreenDimensions()
-        setupVirtualDisplay()
+        resizeVirtualDisplay()
     }
 
     fun release() {
-        try {
-            mediaProjection.unregisterCallback(projectionCallback)
-        } catch (_: Exception) {
-            // Callback might already be unregistered or projection stopped
-        }
-        try {
-            virtualDisplay?.release()
-            virtualDisplay = null
-            imageReader?.close()
-            imageReader = null
-            mediaProjection.stop()
-            Timber.d("ScreenCaptureManager released safely")
-        } catch (e: Exception) {
-            Timber.e(e, "Error releasing ScreenCaptureManager")
+        synchronized(displayLock) {
+            try {
+                mediaProjection.unregisterCallback(projectionCallback)
+            } catch (_: Exception) {
+                // Callback might already be unregistered or projection stopped
+            }
+            try {
+                virtualDisplay?.release()
+                virtualDisplay = null
+                imageReader?.close()
+                imageReader = null
+                mediaProjection.stop()
+                Timber.d("ScreenCaptureManager released safely")
+            } catch (e: Exception) {
+                Timber.e(e, "Error releasing ScreenCaptureManager")
+            }
         }
     }
 }
