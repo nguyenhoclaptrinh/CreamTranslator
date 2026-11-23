@@ -7,20 +7,22 @@ val majorProp = providers.gradleProperty("appVersionMajor").getOrElse("1").toInt
 val minorProp = providers.gradleProperty("appVersionMinor").getOrElse("1").toInt()
 val patchProp = providers.gradleProperty("appVersionPatch").getOrElse("0").toInt()
 
-val tagRef = providers.environmentVariable("GITHUB_REF_NAME").orNull
-    ?: providers.gradleProperty("appTag").orNull
+val tagRef =
+    providers.environmentVariable("GITHUB_REF_NAME").orNull
+        ?: providers.gradleProperty("appTag").orNull
 
-val (major, minor, patch) = if (tagRef != null && tagRef.startsWith("v")) {
-    val cleanTag = tagRef.removePrefix("v")
-    val parts = cleanTag.split(".").mapNotNull { it.toIntOrNull() }
-    Triple(
-        parts.getOrElse(0) { majorProp },
-        parts.getOrElse(1) { minorProp },
-        parts.getOrElse(2) { patchProp },
-    )
-} else {
-    Triple(majorProp, minorProp, patchProp)
-}
+val (major, minor, patch) =
+    if (tagRef != null && tagRef.startsWith("v")) {
+        val cleanTag = tagRef.removePrefix("v")
+        val parts = cleanTag.split(".").mapNotNull { it.toIntOrNull() }
+        Triple(
+            parts.getOrElse(0) { majorProp },
+            parts.getOrElse(1) { minorProp },
+            parts.getOrElse(2) { patchProp },
+        )
+    } else {
+        Triple(majorProp, minorProp, patchProp)
+    }
 
 val appVersionCode = (major * 10000) + (minor * 1000) + patch
 val appVersionName = "$major.$minor.$patch"
