@@ -74,6 +74,8 @@ android {
     lint {
         checkDependencies = false
         checkReleaseBuilds = false
+        checkTestSources = false
+        checkGeneratedSources = false
         abortOnError = true
         htmlReport = true
         xmlReport = true

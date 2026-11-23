@@ -12,6 +12,8 @@ subprojects {
     configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
         config.setFrom(files("$rootDir/detekt.yml"))
         buildUponDefaultConfig = true
+        parallel = true
+        source.setFrom("src/main/java")
     }
 
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
