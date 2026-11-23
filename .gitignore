@@ -48,6 +48,8 @@ Thumbs.db
 *_dump.xml
 *dump*.xml
 screen_*.png
+dist/
+dist_release/
 install_prompt.xml
 proj_dialog.xml
 usb_dump.xml
