@@ -34,12 +34,15 @@ class ScreenCaptureManager(
     var isProjectionActive: Boolean = true
         private set
 
+    var onStopCallback: (() -> Unit)? = null
+
     private val projectionCallback =
         object : MediaProjection.Callback() {
             override fun onStop() {
                 super.onStop()
                 isProjectionActive = false
                 release()
+                onStopCallback?.invoke()
             }
         }
 
