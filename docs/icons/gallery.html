@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>CreamTranslator - Bộ Thiết Kế Kem Xoắn Ốc Quế (Waffle Cone)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: #F8FAFC;
+      color: #0F172A;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    header {
+      text-align: center;
+      max-width: 840px;
+      margin-bottom: 40px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      background: #D97706;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 20px;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      color: #92400E;
+      letter-spacing: -0.5px;
+    }
+    p {
+      color: #64748B;
+      font-size: 15px;
+      line-height: 1.6;
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 36px;
+      width: 100%;
+      max-width: 1200px;
+    }
+    .card {
+      background: #FFFFFF;
+      border: 2px solid #FEF3C7;
+      border-radius: 28px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 12px 30px rgba(217, 119, 6, 0.08);
+      transition: all 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(217, 119, 6, 0.16);
+      border-color: #F59E0B;
+    }
+    .icon-preview {
+      width: 190px;
+      height: 190px;
+      margin-bottom: 24px;
+    }
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 21px;
+      color: #78350F;
+      text-align: center;
+    }
+    .card .tagline {
+      font-size: 12px;
+      color: #D97706;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card .desc {
+      font-size: 14px;
+      color: #64748B;
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 24px;
+      flex-grow: 1;
+    }
+    .spec-box {
+      width: 100%;
+      background: #FFFBEB;
+      border-radius: 16px;
+      padding: 16px;
+      box-sizing: border-box;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #92400E;
+      border: 1px dashed #FCD34D;
+    }
+    .spec-box ul {
+      margin: 6px 0 0 18px;
+      padding: 0;
+    }
+    .spec-box li {
+      margin-bottom: 4px;
+    }
+    .scale-row {
+      display: flex;
+      gap: 20px;
+      align-items: flex-end;
+      padding-top: 16px;
+      border-top: 1px solid #FEF3C7;
+      width: 100%;
+      justify-content: center;
+    }
+    .scale-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .scale-label {
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 600;
+    }
+    .size-72 {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+    }
+    .size-48 {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    }
+    .size-24 {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .size-72 img, .size-48 img, .size-24 img {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">Thiết kế theo đúng yêu cầu: Kem Xoắn Ốc Quế</div>
+    <h1>🍦 3 Mẫu Icon Kem Xoắn Ốc Quế Anime Tiêu Chuẩn</h1>
+    <p>Bánh ốc quế nướng giòn với vân ca rô vàng mật ong sắc nét bên dưới nâng đỡ các tầng kem xoắn bồng bềnh, loại bỏ hoàn toàn cảm giác nhầm lẫn về hình dáng. Tông màu Anime tươi sáng, ngọt ngào.</p>
+  </header>
+
+  <div class="grid">
+    <!-- Cone 1: Dual Flavor -->
+    <div class="card">
+      <img src="cone_1_dual_flavor.svg" class="icon-preview" alt="Cone 1">
+      <div class="tagline">Mẫu 1 • Hai Tầng Vani &amp; Dâu</div>
+      <h2>Ốc Quế Chuyển Ngữ (Dual Flavor Cone)</h2>
+      <div class="desc">Bánh ốc quế vân kim cương giòn rụm, thân kem xoắn 2 nửa vị: kem Vani trắng sữa (bên trái) và kem Dâu tây hồng phấn (bên phải). Ở trung tâm là bảng dịch thuật tròn "A ➔ Á" sắc nét.</div>
+      
+      <div class="spec-box">
+        <strong>Đặc điểm nổi bật:</strong>
+        <ul>
+          <li>Vân ốc quế kim cương nướng vàng rõ rệt.</li>
+          <li>Ký tự dịch thuật "A ➔ Á" dễ đọc khi thu nhỏ.</li>
+          <li>Đỉnh kem xoắn cong nhẹ đáng yêu kiểu anime.</li>
+        </ul>
+      </div>
+
+      <div class="scale-row">
+        <div class="scale-item">
+          <div class="size-72"><img src="cone_1_dual_flavor.svg"></div>
+          <div class="scale-label">72dp (Home)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-48"><img src="cone_1_dual_flavor.svg"></div>
+          <div class="scale-label">48dp (Drawer)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-24"><img src="cone_1_dual_flavor.svg"></div>
+          <div class="scale-label">24dp (Notify)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cone 2: Pastel Rainbow Swirl -->
+    <div class="card">
+      <img src="cone_2_pastel_rainbow.svg" class="icon-preview" alt="Cone 2">
+      <div class="tagline">Mẫu 2 • 3 Cuộn Xoắn Cầu Vồng</div>
+      <h2>Ốc Quế Cầu Vồng (Rainbow Swirl Cone)</h2>
+      <div class="desc">Kem xoắn 3 cuộn màu pastel anime mềm mại (Dâu hồng - Vani sữa - Bạc hà Cyan), miệng ốc quế lượn sóng điệu đà, trên đỉnh cắm cờ dịch thuật "CT" màu xanh Sky Blue.</div>
+      
+      <div class="spec-box">
+        <strong>Đặc điểm nổi bật:</strong>
+        <ul>
+          <li>3 Tầng kem xoắn bồng bềnh như mây.</li>
+          <li>Cờ dịch thuật "CT" cắm trên đỉnh kem độc đáo.</li>
+          <li>Nền gradient hoa anh đào sakura ngọt ngào.</li>
+        </ul>
+      </div>
+
+      <div class="scale-row">
+        <div class="scale-item">
+          <div class="size-72"><img src="cone_2_pastel_rainbow.svg"></div>
+          <div class="scale-label">72dp (Home)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-48"><img src="cone_2_pastel_rainbow.svg"></div>
+          <div class="scale-label">48dp (Drawer)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-24"><img src="cone_2_pastel_rainbow.svg"></div>
+          <div class="scale-label">24dp (Notify)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cone 3: Minimal Waffle -->
+    <div class="card">
+      <img src="cone_3_minimal_waffle.svg" class="icon-preview" alt="Cone 3">
+      <div class="tagline">Mẫu 3 • Tối Giản Biểu Tượng</div>
+      <h2>Ốc Quế Hình Học (Geometric Waffle)</h2>
+      <div class="desc">Ốc quế phẳng tối giản hình học với lưới ca rô đậm nét, bên trên là cụm 3 múi kem xoắn trắng muốt phủ sốt dâu bóng bẩy, nổi bật với huy hiệu dịch thuật 2 mũi tên đảo chiều.</div>
+      
+      <div class="spec-box">
+        <strong>Đặc điểm nổi bật:</strong>
+        <ul>
+          <li>Chuẩn hóa hình học Material Design 3.</li>
+          <li>Huy hiệu 2 mũi tên chuyển ngữ tương phản cao.</li>
+          <li>Nhận diện cực mạnh dù ở kích thước rất nhỏ.</li>
+        </ul>
+      </div>
+
+      <div class="scale-row">
+        <div class="scale-item">
+          <div class="size-72"><img src="cone_3_minimal_waffle.svg"></div>
+          <div class="scale-label">72dp (Home)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-48"><img src="cone_3_minimal_waffle.svg"></div>
+          <div class="scale-label">48dp (Drawer)</div>
+        </div>
+        <div class="scale-item">
+          <div class="size-24"><img src="cone_3_minimal_waffle.svg"></div>
+          <div class="scale-label">24dp (Notify)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
