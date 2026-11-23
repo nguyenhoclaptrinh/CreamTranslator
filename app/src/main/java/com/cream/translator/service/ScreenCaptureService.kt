@@ -78,7 +78,7 @@ class ScreenCaptureService : Service() {
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.notification_title))
                 .setContentText(getString(R.string.notification_text))
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
+                .setSmallIcon(R.drawable.ic_notification_capture)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
