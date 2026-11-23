@@ -71,9 +71,9 @@ object TextInpainter {
      * Determines optimal contrasting text color (White or Black) based on background luminance.
      */
     fun calculateContrastingTextColor(backgroundColor: Int): Int {
-        val red = Color.red(backgroundColor)
-        val green = Color.green(backgroundColor)
-        val blue = Color.blue(backgroundColor)
+        val red = (backgroundColor shr 16) and 0xFF
+        val green = (backgroundColor shr 8) and 0xFF
+        val blue = backgroundColor and 0xFF
 
         // Relative luminance calculation
         val luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0

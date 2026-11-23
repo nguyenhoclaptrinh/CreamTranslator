@@ -8,14 +8,14 @@ import org.junit.Test
 class TextInpainterTest {
     @Test
     fun calculateContrastingTextColor_withDarkBackground_returnsWhite() {
-        val darkColor = Color.rgb(20, 20, 20)
+        val darkColor = (0xFF shl 24) or (20 shl 16) or (20 shl 8) or 20
         val textColor = TextInpainter.calculateContrastingTextColor(darkColor)
         assertEquals(Color.WHITE, textColor)
     }
 
     @Test
     fun calculateContrastingTextColor_withBrightBackground_returnsBlack() {
-        val brightColor = Color.rgb(240, 240, 240)
+        val brightColor = (0xFF shl 24) or (240 shl 16) or (240 shl 8) or 240
         val textColor = TextInpainter.calculateContrastingTextColor(brightColor)
         assertEquals(Color.BLACK, textColor)
     }
