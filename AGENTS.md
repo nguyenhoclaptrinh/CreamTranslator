@@ -156,28 +156,59 @@ git checkout -b <type>/<ten-tinh-nang-ngan-gon>
 # 2. Thực hiện sửa đổi mã nguồn và kiểm tra cục bộ
 # ... Chỉnh sửa code ...
 
-# 3. Format mã nguồn tự động (nếu môi trường có Java) và ủy thác kiểm tra chất lượng cho CI
+# 3. Quản trị tri thức: Nếu phát sinh ý tưởng mới chưa làm -> tạo RFC; nếu đổi kiến trúc -> tạo/cập nhật ADR
+# (Tuân thủ theo mẫu trong docs/templates/ và cập nhật vào docs/README.md)
+
+# 4. Format mã nguồn tự động (nếu môi trường có Java) và ủy thác kiểm tra chất lượng cho CI
 # (Agent không cần tự chạy full test cục bộ vì CI Actions sẽ tự động kiểm định song song trên RAM disk)
 ./gradlew spotlessApply || true
 
-# 4. Commit bằng Conventional Commits
+# 5. Commit bằng Conventional Commits
 git add .
 git commit -m "<type>(<pham-vi>): <mo-ta-ngan-gon-bang-tieng-anh-hoac-viet>"
 
-# 5. Đồng bộ nhánh với main mới nhất trước khi mở PR
+# 6. Đồng bộ nhánh với main mới nhất trước khi mở PR
 git fetch origin main
 git merge origin/main
 
-# 6. Đẩy nhánh lên remote và mở Pull Request
+# 7. Đẩy nhánh lên remote và mở Pull Request
 git push -u origin <type>/<ten-tinh-nang-ngan-gon>
 gh pr create --title "<type>(<pham-vi>): <tieu-de>" --body "<Mo-ta-chi-tiet-thay-doi>"
 
-# 7. Đồng bộ nhánh nếu main có commit mới trong lúc chờ review
+# 8. Đồng bộ nhánh nếu main có commit mới trong lúc chờ review
 gh pr update-branch <pr-number> || true
 
-# 8. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
+# 9. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
 gh pr checks <pr-number> --watch
 
-# 9. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
+# 10. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
 # TUYỆT ĐỐI KHÔNG tự chạy 'gh pr merge' trừ khi có lệnh tường minh từ người dùng!
 ```
+
+---
+
+## 7. Tiêu chuẩn Quản trị Tri thức & Tài liệu hóa Kỹ thuật (Technical Documentation Architecture)
+
+Để đảm bảo dự án phát triển bền vững, không tích lũy nợ kỹ thuật và không bị trôi dạt các ý tưởng cải tiến, mọi Agent và lập trình viên phải tuân thủ kiến trúc tài liệu phân tầng tại thư mục `docs/`:
+
+### 1. Phân định Ranh giới ADR và RFC
+- **Architecture Decision Record (ADR)** (`docs/adr/ADR-xxx-<ten-quyet-dinh>.md`):
+  - **Mục đích**: Ghi nhận các quyết định kiến trúc, lựa chọn công nghệ hoặc ranh giới bất biến đã được áp dụng chính thức vào mã nguồn.
+  - **Khi nào viết**: Bắt buộc tạo mới khi thay đổi công nghệ nền tảng, cơ chế đồng bộ luồng, kiến trúc bảo mật (ví dụ: Anti-Cheat) hoặc quy chuẩn thiết kế hệ thống.
+  - **Trạng thái**: `Proposed` ➔ `Accepted` ➔ `Superseded`.
+  - **Biểu mẫu chuẩn**: [docs/templates/TEMPLATE_ADR.md](file:///d:/Workspaces/Tools/CreamTranslator/docs/templates/TEMPLATE_ADR.md).
+- **Request for Comments / Proposal (RFC)** (`docs/proposals/RFC-xxx-<ten-de-xuat>.md`):
+  - **Mục đích**: Đặc tả chi tiết các ý tưởng tính năng mới, cải tiến trải nghiệm người dùng (UX) hoặc tái cấu trúc kỹ thuật được phát hiện trong quá trình trao đổi nhưng chưa triển khai ngay trong task hiện tại.
+  - **Khi nào viết**: Bắt buộc tạo mới khi người dùng hoặc Agent đề xuất một giải pháp/ý tưởng có giá trị nhưng quyết định để dành cho tương lai, nhằm tránh lạm phát phạm vi (scope creep) mà vẫn bảo toàn tri thức thiết kế.
+  - **Trạng thái**: `Proposed` ➔ `Accepted` ➔ `Implemented` / `Rejected` / `Superseded`.
+  - **Biểu mẫu chuẩn**: [docs/templates/TEMPLATE_RFC.md](file:///d:/Workspaces/Tools/CreamTranslator/docs/templates/TEMPLATE_RFC.md).
+
+### 2. Quy tắc Đặt tên & Đánh số Thứ tự
+- Định dạng bắt buộc: `<LOAI>-<XXX>-<ten-ngan-gon-kebab-case>.md` (với `<XXX>` là số thứ tự 3 chữ số tăng đơn điệu: `001`, `002`, `003`...).
+- Ví dụ:
+  - `docs/adr/ADR-001-on-device-mlkit-pipeline.md`
+  - `docs/proposals/RFC-001-floating-quick-action-menu.md`
+
+### 3. Đồng bộ Mục lục Tri thức Trung tâm
+- Mọi bản ADR hoặc RFC khi được tạo mới hoặc thay đổi trạng thái đều phải được cập nhật ngay lập tức vào bảng mục lục tra cứu trung tâm tại [docs/README.md](file:///d:/Workspaces/Tools/CreamTranslator/docs/README.md).
+
