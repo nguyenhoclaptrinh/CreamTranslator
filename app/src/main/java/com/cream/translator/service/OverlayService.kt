@@ -205,7 +205,11 @@ class OverlayService : Service() {
                             }
 
                         if (textRegions.isEmpty()) {
-                            Toast.makeText(this@OverlayService, "Không tìm thấy chữ trên màn hình", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this@OverlayService,
+                                "Không tìm thấy chữ trên màn hình",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             isProcessing = false
                             return@launch
                         }

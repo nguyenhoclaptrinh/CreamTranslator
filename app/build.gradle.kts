@@ -3,6 +3,11 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+val baseVersion = "1.0"
+val envBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val appVersionCode = envBuildNumber ?: 1
+val appVersionName = if (envBuildNumber != null) "$baseVersion.$envBuildNumber" else "$baseVersion.0"
+
 android {
     namespace = "com.cream.translator"
     compileSdk = 34
@@ -11,8 +16,8 @@ android {
         applicationId = "com.cream.translator"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

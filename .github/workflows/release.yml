@@ -2,9 +2,13 @@ name: Publish Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: release-pipeline
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -29,16 +33,19 @@ jobs:
 
       - name: Build Release APK
         run: |
+          BUILD_NUM="${GITHUB_RUN_NUMBER}"
+          TAG_NAME="v1.0.${BUILD_NUM}"
+          echo "Building Release APK for version ${TAG_NAME} (versionCode: ${BUILD_NUM})..."
           ./gradlew assembleRelease
-          TAG_NAME="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.0' }}"
           mkdir -p dist
           cp app/build/outputs/apk/release/*.apk "dist/CreamTranslator-${TAG_NAME}.apk"
           echo "RELEASE_APK=dist/CreamTranslator-${TAG_NAME}.apk" >> $GITHUB_ENV
           echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release & Tag
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
           files: ${{ env.RELEASE_APK }}
           generate_release_notes: true
+          name: "CreamTranslator ${{ env.TAG_NAME }}"
