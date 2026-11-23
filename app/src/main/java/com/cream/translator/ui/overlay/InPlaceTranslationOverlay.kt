@@ -24,6 +24,7 @@ class InPlaceTranslationOverlay
     ) : View(context, attrs, defStyleAttr) {
         private val results = mutableListOf<TranslationResult>()
         private val toggledRegions = mutableSetOf<String>()
+        private val renderedPlates = mutableMapOf<String, RectF>()
         var onDismissListener: (() -> Unit)? = null
 
         private val bgPaint =
@@ -45,18 +46,22 @@ class InPlaceTranslationOverlay
 
         init {
             isClickable = true
+            fitsSystemWindows = false
+            setPadding(0, 0, 0, 0)
         }
 
         fun setResults(newResults: List<TranslationResult>) {
             results.clear()
             results.addAll(newResults)
             toggledRegions.clear()
+            renderedPlates.clear()
             invalidate()
         }
 
         fun clear() {
             results.clear()
             toggledRegions.clear()
+            renderedPlates.clear()
             invalidate()
         }
 
@@ -72,13 +77,10 @@ class InPlaceTranslationOverlay
             item: TranslationResult,
         ) {
             val rect = item.region.boundingBox
-            val rectF =
-                RectF(
-                    rect.left.toFloat(),
-                    rect.top.toFloat(),
-                    rect.right.toFloat(),
-                    rect.bottom.toFloat(),
-                )
+            val density = resources.displayMetrics.density
+            val padX = 6f * density
+            val padY = 4f * density
+            val cornerRadius = 6f * density
 
             val isShowingOriginal = toggledRegions.contains(item.region.id)
             val displayText = if (isShowingOriginal) item.region.originalText else item.translatedText
@@ -91,27 +93,56 @@ class InPlaceTranslationOverlay
                     ?: TextInpainter.calculateContrastingTextColor(bgColor)
             textPaint.color = textColor
 
-            val fontSize =
+            // Calculate starting font size
+            val targetContentWidth = maxOf(20, (rect.width() - 2f * padX).toInt())
+            var currentSp =
                 TextInpainter.calculateOptimalFontSize(
                     rect.width(),
                     rect.height(),
                     displayText.length,
-                    resources.displayMetrics.density,
+                    density,
                 )
-            textPaint.textSize = fontSize * resources.displayMetrics.density
+            textPaint.textSize = currentSp * density
+            var staticLayout = createStaticLayout(displayText, targetContentWidth)
+
+            // Downscale font size if rendered text exceeds bounding box height
+            val targetHeight = rect.height() - 2f * padY
+            while (staticLayout.height > targetHeight && currentSp > 10f) {
+                currentSp = maxOf(10f, currentSp - 1f)
+                textPaint.textSize = currentSp * density
+                staticLayout = createStaticLayout(displayText, targetContentWidth)
+            }
+
+            // Compute adaptive plate bounds that expand if rendered text still exceeds original box
+            val plateBounds =
+                TextInpainter.computePlateBounds(
+                    box =
+                        TextInpainter.BoxCoordinates(
+                            rect.left.toFloat(),
+                            rect.top.toFloat(),
+                            rect.right.toFloat(),
+                            rect.bottom.toFloat(),
+                        ),
+                    textSize = Pair(staticLayout.width.toFloat(), staticLayout.height.toFloat()),
+                    padding = Pair(padX, padY),
+                    screenSize =
+                        Pair(
+                            width.toFloat().takeIf { it > 0 } ?: Float.MAX_VALUE,
+                            height.toFloat().takeIf { it > 0 } ?: Float.MAX_VALUE,
+                        ),
+                )
+            val plateRectF = RectF(plateBounds.left, plateBounds.top, plateBounds.right, plateBounds.bottom)
+            renderedPlates[item.region.id] = plateRectF
 
             // Draw rounded inpainting background plate
-            canvas.drawRoundRect(rectF, 8f, 8f, bgPaint)
-            canvas.drawRoundRect(rectF, 8f, 8f, borderPaint)
+            canvas.drawRoundRect(plateRectF, cornerRadius, cornerRadius, bgPaint)
+            canvas.drawRoundRect(plateRectF, cornerRadius, cornerRadius, borderPaint)
 
-            val contentWidth = maxOf(1, rect.width() - 8)
-            val staticLayout = createStaticLayout(displayText, contentWidth)
-
-            // Center static layout vertically and horizontally inside bounding box
+            // Center static layout vertically and horizontally inside the adaptive plate
             canvas.save()
-            val textHeight = staticLayout.height
-            val offsetY = rectF.centerY() - textHeight / 2f
-            canvas.translate(rectF.left + 4f, offsetY)
+            val offsetX = plateRectF.centerX() - staticLayout.width / 2f
+            val offsetY = plateRectF.centerY() - staticLayout.height / 2f
+            canvas.translate(offsetX, offsetY)
             staticLayout.draw(canvas)
             canvas.restore()
         }
@@ -146,7 +177,9 @@ class InPlaceTranslationOverlay
                     val y = event.y.toInt()
 
                     for (item in results) {
-                        if (item.region.boundingBox.contains(x, y)) {
+                        val plate = renderedPlates[item.region.id]
+                        val isHit = plate?.contains(event.x, event.y) ?: item.region.boundingBox.contains(x, y)
+                        if (isHit) {
                             // Toggle between original text and translated text
                             if (toggledRegions.contains(item.region.id)) {
                                 toggledRegions.remove(item.region.id)

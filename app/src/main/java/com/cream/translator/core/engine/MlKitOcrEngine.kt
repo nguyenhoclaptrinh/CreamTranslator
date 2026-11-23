@@ -28,20 +28,20 @@ class MlKitOcrEngine : OcrEngine {
                     if (!continuation.isActive) return@addOnSuccessListener
                     val regions = mutableListOf<TextRegion>()
 
-                    // Iterate over text blocks and lines
+                    // Process by logical TextBlocks to preserve full sentence context
+                    // and avoid line overlapping / vertical collision when translated text expands
                     for (block in visionText.textBlocks) {
-                        for (line in block.lines) {
-                            val box = line.boundingBox ?: Rect(0, 0, 0, 0)
-                            if (line.text.isNotBlank() && box.width() > 5 && box.height() > 5) {
-                                regions.add(
-                                    TextRegion(
-                                        id = UUID.randomUUID().toString(),
-                                        originalText = line.text.trim(),
-                                        boundingBox = box,
-                                        confidence = 1.0f,
-                                    ),
-                                )
-                            }
+                        val box = block.boundingBox ?: Rect(0, 0, 0, 0)
+                        val text = block.text.replace("\\s+".toRegex(), " ").trim()
+                        if (text.isNotBlank() && box.width() > 10 && box.height() > 10) {
+                            regions.add(
+                                TextRegion(
+                                    id = UUID.randomUUID().toString(),
+                                    originalText = text,
+                                    boundingBox = box,
+                                    confidence = 1.0f,
+                                ),
+                            )
                         }
                     }
                     Timber.d("OCR detected %d text regions", regions.size)

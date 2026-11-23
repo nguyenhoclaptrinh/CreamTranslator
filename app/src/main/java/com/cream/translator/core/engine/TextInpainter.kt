@@ -3,6 +3,8 @@ package com.cream.translator.core.engine
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 object TextInpainter {
@@ -93,7 +95,7 @@ object TextInpainter {
     }
 
     /**
-     * Calculates optimal dynamic font size (in SP / pixels) to fit inside the bounding box.
+     * Calculates optimal dynamic font size (in SP) to fit inside the bounding box.
      */
     fun calculateOptimalFontSize(
         boxWidth: Int,
@@ -103,12 +105,88 @@ object TextInpainter {
     ): Float {
         if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0 || density <= 0f) return 14f
 
+        val safeDensity = if (density <= 0f) 1.0f else density
+        val boxHeightDp = boxHeight / safeDensity
         val area = boxWidth.toFloat() * boxHeight.toFloat()
-        // Approximate character cell dimension
-        val targetCharArea = area / (textLength * 1.2f)
-        val calculatedSize = sqrt(targetCharArea) / density
 
-        // Clamp font size between 10sp and 28sp for readability in mobile games
-        return calculatedSize.coerceIn(10f, 28f)
+        // Approximate character cell dimension
+        val targetCharArea = area / (textLength * 1.15f)
+        val sizeFromArea = sqrt(targetCharArea) / safeDensity
+
+        // For single-line or small height boxes, prevent font height from exceeding box height
+        val estimatedLines = max(1, (textLength * sizeFromArea * safeDensity * 0.55f / boxWidth).toInt())
+        val maxFontPerLine = (boxHeightDp / estimatedLines) * 0.85f
+
+        val bestSize = min(sizeFromArea, maxFontPerLine)
+        return bestSize.coerceIn(10f, 28f)
+    }
+
+    data class BoxCoordinates(
+        val left: Float,
+        val top: Float,
+        val right: Float,
+        val bottom: Float,
+    ) {
+        val width: Float get() = max(0f, right - left)
+        val height: Float get() = max(0f, bottom - top)
+        val centerX: Float get() = left + width / 2f
+        val centerY: Float get() = top + height / 2f
+    }
+
+    /**
+     * Calculates adaptive plate bounds that symmetrically expand if rendered text
+     * exceeds the original bounding box, keeping text centered and within screen boundaries.
+     */
+    fun computePlateBounds(
+        box: BoxCoordinates,
+        textSize: Pair<Float, Float>,
+        padding: Pair<Float, Float>,
+        screenSize: Pair<Float, Float> = Pair(Float.MAX_VALUE, Float.MAX_VALUE),
+    ): BoxCoordinates {
+        val textWidth = textSize.first
+        val textHeight = textSize.second
+        val horizontalPadding = padding.first
+        val verticalPadding = padding.second
+
+        val requiredWidth = textWidth + horizontalPadding * 2f
+        val requiredHeight = textHeight + verticalPadding * 2f
+
+        val finalWidth = max(box.width, requiredWidth)
+        val finalHeight = max(box.height, requiredHeight)
+
+        val centerX = box.centerX
+        val centerY = box.centerY
+
+        var left = centerX - finalWidth / 2f
+        var right = centerX + finalWidth / 2f
+        var top = centerY - finalHeight / 2f
+        var bottom = centerY + finalHeight / 2f
+
+        val screenWidth = screenSize.first
+        val screenHeight = screenSize.second
+
+        // Clamp to screen boundaries if boundaries are specified
+        if (left < 0f) {
+            val shift = -left
+            left = 0f
+            right = min(screenWidth, right + shift)
+        }
+        if (right > screenWidth) {
+            val shift = right - screenWidth
+            right = screenWidth
+            left = max(0f, left - shift)
+        }
+        if (top < 0f) {
+            val shift = -top
+            top = 0f
+            bottom = min(screenHeight, bottom + shift)
+        }
+        if (bottom > screenHeight) {
+            val shift = bottom - screenHeight
+            bottom = screenHeight
+            top = max(0f, top - shift)
+        }
+
+        return BoxCoordinates(left, top, right, bottom)
     }
 }
