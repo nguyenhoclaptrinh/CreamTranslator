@@ -72,7 +72,20 @@ jobs:
 
       - name: Fast Pass for Documentation
         if: steps.filter.outputs.code != 'true'
-        run: echo "Documentation-only change detected. Quality Gate passed in fast-skip mode."
+        run: |
+          echo "### ⚡ Fast Pass: Documentation Only" >> $GITHUB_STEP_SUMMARY
+          echo "No code changes detected. Code Quality Gate passed in fast-skip mode." >> $GITHUB_STEP_SUMMARY
+
+      - name: Summarize Quality Diagnostics
+        if: always() && steps.filter.outputs.code == 'true'
+        run: |
+          echo "### 🔍 Code Quality & Test Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f app/build/reports/detekt/detekt.html ]; then
+            echo "- **Detekt**: Static analysis complete." >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f app/build/reports/lint-results-debug.html ]; then
+            echo "- **Android Lint**: Lint analysis complete." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Diagnostic Reports on Failure
         if: failure() && steps.filter.outputs.code == 'true'
@@ -141,4 +154,6 @@ jobs:
 
       - name: Fast Pass for Documentation
         if: steps.filter.outputs.code != 'true'
-        run: echo "Documentation-only change detected. APK assemble skipped."
+        run: |
+          echo "### ⚡ Fast Pass: Documentation Only" >> $GITHUB_STEP_SUMMARY
+          echo "No code changes detected. Debug APK compilation skipped." >> $GITHUB_STEP_SUMMARY

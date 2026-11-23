@@ -2,13 +2,21 @@
 # Git Pre-commit hook for CreamTranslator
 # Ensures code formatting standards before committing
 
-echo "[HOOK] Running pre-commit code formatting check..."
+# Fast Check: Only run Spotless if Kotlin or Gradle configuration files are staged
+STAGED_CODE_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(kt|kts|properties)$' || true)
+
+if [ -z "$STAGED_CODE_FILES" ]; then
+    echo "[HOOK] Fast-pass: No Kotlin or Gradle source files staged. Skipping Spotless check."
+    exit 0
+fi
+
+echo "[HOOK] Source files detected. Running pre-commit code formatting check..."
 
 if command -v java >/dev/null 2>&1 && [ -f "./gradlew" ]; then
-    ./gradlew spotlessCheck --daemon
+    ./gradlew spotlessCheck --daemon --continue
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        echo "[ERROR] Code formatting check failed! Please run './gradlew spotlessApply' before committing."
+        echo "[ERROR] Code formatting check failed! Please run './gradlew spotlessApply' to format automatically."
         exit 1
     fi
 else
