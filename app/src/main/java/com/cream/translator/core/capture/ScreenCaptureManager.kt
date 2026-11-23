@@ -9,6 +9,8 @@ import android.hardware.display.VirtualDisplay
 import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
+import android.os.Handler
+import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +29,18 @@ class ScreenCaptureManager(
     private var screenWidth: Int = 1080
     private var screenHeight: Int = 1920
 
+    private val projectionCallback =
+        object : MediaProjection.Callback() {
+            override fun onStop() {
+                super.onStop()
+                release()
+            }
+        }
+
     init {
+        // Android 14+ (API 34+) strictly requires registering a MediaProjection.Callback
+        // before createVirtualDisplay() is called, otherwise throwing IllegalStateException.
+        mediaProjection.registerCallback(projectionCallback, Handler(Looper.getMainLooper()))
         updateScreenDimensions()
         setupVirtualDisplay()
     }
@@ -120,6 +133,11 @@ class ScreenCaptureManager(
     }
 
     fun release() {
+        try {
+            mediaProjection.unregisterCallback(projectionCallback)
+        } catch (_: Exception) {
+            // Callback might already be unregistered or projection stopped
+        }
         try {
             virtualDisplay?.release()
             virtualDisplay = null
