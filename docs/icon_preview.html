@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>CreamTranslator - Icon Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #0B0F19;
+      color: #F8FAFC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    h1 {
+      margin-bottom: 8px;
+      font-size: 28px;
+      color: #FFF9EB;
+    }
+    p {
+      color: #94A3B8;
+      margin-top: 0;
+      margin-bottom: 32px;
+    }
+    .grid {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .card {
+      background: #1E293B;
+      padding: 24px;
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      border: 1px solid #334155;
+    }
+    .card h3 {
+      margin: 16px 0 4px;
+      font-size: 16px;
+      color: #E2E8F0;
+    }
+    .card span {
+      font-size: 13px;
+      color: #64748B;
+    }
+    .preview-large {
+      width: 256px;
+      height: 256px;
+    }
+    .preview-phone {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+    .preview-round {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+    .preview-widget {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #0084FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: white;
+      border: 2px solid white;
+      box-shadow: 0 8px 20px rgba(0,132,255,0.4);
+    }
+  </style>
+</head>
+<body>
+  <h1>🍦 CreamTranslator - Bản thiết kế Biểu tượng (Icon Concept)</h1>
+  <p>Chủ đề: Xoáy kem vani mềm kết hợp khung đối thoại dịch thuật Gaming</p>
+
+  <div class="grid">
+    <!-- Store & High-res Display -->
+    <div class="card">
+      <img src="cream_translator_icon.svg" class="preview-large" alt="Store Icon">
+      <h3>Store & Release Icon</h3>
+      <span>512 x 512 px</span>
+    </div>
+
+    <!-- Android Squircle Adaptive Icon -->
+    <div class="card">
+      <img src="cream_translator_icon.svg" class="preview-phone" alt="Launcher Icon">
+      <h3>Launcher Squircle</h3>
+      <span>Màn hình chính Android</span>
+    </div>
+
+    <!-- Android Round Launcher Icon -->
+    <div class="card">
+      <img src="cream_translator_icon.svg" class="preview-round" alt="Round Icon">
+      <h3>Launcher Tròn</h3>
+      <span>Google Pixel / Xiaomi Launcher</span>
+    </div>
+
+    <!-- In-game Floating Widget -->
+    <div class="card">
+      <div class="preview-widget">CT</div>
+      <h3>Nút nổi trong game</h3>
+      <span>Floating Pill Widget</span>
+    </div>
+  </div>
+</body>
+</html>

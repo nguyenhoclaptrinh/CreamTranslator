@@ -4,10 +4,35 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Stylized speech bubble plate -->
     <path
-        android:fillColor="#3DDC84"
-        android:pathData="M0,0h108v108h-108z" />
+        android:fillColor="#1F2A44"
+        android:pathData="M32,36 h44 a14,14 0 0,1 14,14 v16 a14,14 0 0,1 -14,14 h-24 l-12,10 v-10 h-8 a14,14 0 0,1 -14,-14 v-16 a14,14 0 0,1 14,-14 z" />
+
+    <!-- Soft Cream Swirl Base -->
     <path
-        android:fillColor="#000000"
-        android:pathData="M30,30h48v48h-48z" />
+        android:fillColor="#FFF4E0"
+        android:pathData="M54,30 C58,30 63,33 65,37 C67,41 65,46 61,48 C57,50 51,49 47,46 C44,43 45,37 49,33 C51,31 53,30 54,30 Z" />
+
+    <!-- Cream Middle Swirl Body -->
+    <path
+        android:fillColor="#FFE8C2"
+        android:pathData="M43,45 C49,43 59,43 65,47 C71,51 72,58 68,64 C64,70 52,71 44,66 C37,62 38,53 43,47 Z" />
+
+    <!-- Cyan Translation Glyphs / Curved Arrows inside the speech bubble -->
+    <!-- Top Arrow (Left to Right) -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M42,54 L52,54 L49,51 L51,49 L56,54 L51,59 L49,57 L52,55 L42,55 Z" />
+
+    <!-- Bottom Arrow (Right to Left) -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M66,62 L56,62 L59,59 L57,57 L52,62 L57,67 L59,65 L56,63 L66,63 Z" />
+
+    <!-- Whipped Cream Tip Accent -->
+    <path
+        android:fillColor="#FFFDF7"
+        android:pathData="M54,26 C55,27 56,29 55,30 C54,31 52,31 52,29 C52,27 53,26 54,26 Z" />
 </vector>
