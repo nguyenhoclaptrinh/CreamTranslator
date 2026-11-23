@@ -12,6 +12,7 @@ import android.media.projection.MediaProjection
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
@@ -74,8 +75,8 @@ class ScreenCaptureManager(
             try {
                 image = reader.acquireLatestImage()
                 if (image == null) {
-                    // Wait briefly for a frame to render
-                    Thread.sleep(50)
+                    // Wait briefly for a frame to render without blocking thread
+                    delay(50)
                     image = reader.acquireLatestImage()
                 }
                 if (image == null) {
