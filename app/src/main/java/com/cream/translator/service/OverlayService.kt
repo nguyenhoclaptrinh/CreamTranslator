@@ -354,6 +354,28 @@ class OverlayService : Service() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (isOverlayShowing) {
+            dismissTranslationOverlay()
+        }
+        floatingTriggerView?.let { trigger ->
+            triggerParams?.let { params ->
+                val displayMetrics = resources.displayMetrics
+                val maxX = displayMetrics.widthPixels - params.width
+                val maxY = displayMetrics.heightPixels - params.height
+                params.x = params.x.coerceIn(0, maxOf(0, maxX))
+                params.y = params.y.coerceIn(0, maxOf(0, maxY))
+                try {
+                    windowManager?.updateViewLayout(trigger, params)
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to update trigger layout on configuration change")
+                }
+            }
+        }
+        Timber.d("OverlayService configuration changed and views adjusted")
+    }
+
     override fun onDestroy() {
         dismissTranslationOverlay()
         if (floatingTriggerView != null) {

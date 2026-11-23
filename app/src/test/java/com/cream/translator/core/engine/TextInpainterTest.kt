@@ -90,4 +90,38 @@ class TextInpainterTest {
         assertTrue(bounds.left >= 0f)
         assertTrue(bounds.top >= 0f)
     }
+
+    @Test
+    fun calculateCollisionFreeExpansion_withAdjacentNeighbor_restrictsExpansion() {
+        val targetBox = TextInpainter.BoxCoordinates(100f, 100f, 200f, 140f)
+        val neighborRight = TextInpainter.BoxCoordinates(220f, 100f, 320f, 140f) // 20px gap
+
+        val constraints =
+            TextInpainter.calculateCollisionFreeExpansion(
+                targetBox = targetBox,
+                otherBoxes = listOf(neighborRight),
+                safetyMargin = 2f,
+            )
+
+        // Gap = 20px, safeHalf = 10px, - 2px safetyMargin = 8px
+        assertEquals(8f, constraints.maxExpandRight, 0.01f)
+        assertEquals(Float.MAX_VALUE, constraints.maxExpandLeft, 0.01f)
+    }
+
+    @Test
+    fun computePlateBounds_withCollisionConstraint_doesNotExceedConstraint() {
+        val targetBox = TextInpainter.BoxCoordinates(100f, 100f, 200f, 140f)
+        val constraints = TextInpainter.ExpansionConstraints(maxExpandRight = 8f)
+
+        val bounds =
+            TextInpainter.computePlateBounds(
+                box = targetBox,
+                textSize = Pair(250f, 40f), // Wants 250px + 20px = 270px width (expand 35px each side)
+                padding = Pair(10f, 10f),
+                constraints = constraints,
+            )
+
+        // Right bound must not expand beyond targetBox.right + 8f (208f)
+        assertTrue(bounds.right <= 208.01f)
+    }
 }

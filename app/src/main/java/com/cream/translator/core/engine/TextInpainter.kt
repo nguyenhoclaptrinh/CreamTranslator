@@ -133,6 +133,62 @@ object TextInpainter {
         val centerY: Float get() = top + height / 2f
     }
 
+    data class ExpansionConstraints(
+        val maxExpandLeft: Float = Float.MAX_VALUE,
+        val maxExpandRight: Float = Float.MAX_VALUE,
+        val maxExpandTop: Float = Float.MAX_VALUE,
+        val maxExpandBottom: Float = Float.MAX_VALUE,
+    )
+
+    /**
+     * Calculates the maximum safe expansion distances in all four directions
+     * to prevent colliding with neighboring bounding boxes.
+     */
+    fun calculateCollisionFreeExpansion(
+        targetBox: BoxCoordinates,
+        otherBoxes: List<BoxCoordinates>,
+        safetyMargin: Float = 4f,
+    ): ExpansionConstraints {
+        var maxExpandLeft = Float.MAX_VALUE
+        var maxExpandRight = Float.MAX_VALUE
+        var maxExpandTop = Float.MAX_VALUE
+        var maxExpandBottom = Float.MAX_VALUE
+
+        for (other in otherBoxes) {
+            // Check vertical overlap for horizontal neighbors
+            val hasVerticalOverlap =
+                max(targetBox.top, other.top) < min(targetBox.bottom, other.bottom) + 8f
+            if (hasVerticalOverlap) {
+                if (other.left >= targetBox.right) {
+                    val gap = max(0f, other.left - targetBox.right)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandRight = min(maxExpandRight, safeHalf)
+                } else if (other.right <= targetBox.left) {
+                    val gap = max(0f, targetBox.left - other.right)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandLeft = min(maxExpandLeft, safeHalf)
+                }
+            }
+
+            // Check horizontal overlap for vertical neighbors
+            val hasHorizontalOverlap =
+                max(targetBox.left, other.left) < min(targetBox.right, other.right) + 8f
+            if (hasHorizontalOverlap) {
+                if (other.top >= targetBox.bottom) {
+                    val gap = max(0f, other.top - targetBox.bottom)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandBottom = min(maxExpandBottom, safeHalf)
+                } else if (other.bottom <= targetBox.top) {
+                    val gap = max(0f, targetBox.top - other.bottom)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandTop = min(maxExpandTop, safeHalf)
+                }
+            }
+        }
+
+        return ExpansionConstraints(maxExpandLeft, maxExpandRight, maxExpandTop, maxExpandBottom)
+    }
+
     /**
      * Calculates adaptive plate bounds that symmetrically expand if rendered text
      * exceeds the original bounding box, keeping text centered and within screen boundaries.
@@ -142,6 +198,7 @@ object TextInpainter {
         textSize: Pair<Float, Float>,
         padding: Pair<Float, Float>,
         screenSize: Pair<Float, Float> = Pair(Float.MAX_VALUE, Float.MAX_VALUE),
+        constraints: ExpansionConstraints = ExpansionConstraints(),
     ): BoxCoordinates {
         val textWidth = textSize.first
         val textHeight = textSize.second
@@ -151,16 +208,18 @@ object TextInpainter {
         val requiredWidth = textWidth + horizontalPadding * 2f
         val requiredHeight = textHeight + verticalPadding * 2f
 
-        val finalWidth = max(box.width, requiredWidth)
-        val finalHeight = max(box.height, requiredHeight)
+        val desiredExpandX = max(0f, (requiredWidth - box.width) / 2f)
+        val desiredExpandY = max(0f, (requiredHeight - box.height) / 2f)
 
-        val centerX = box.centerX
-        val centerY = box.centerY
+        val expandLeft = min(desiredExpandX, constraints.maxExpandLeft)
+        val expandRight = min(desiredExpandX, constraints.maxExpandRight)
+        val expandTop = min(desiredExpandY, constraints.maxExpandTop)
+        val expandBottom = min(desiredExpandY, constraints.maxExpandBottom)
 
-        var left = centerX - finalWidth / 2f
-        var right = centerX + finalWidth / 2f
-        var top = centerY - finalHeight / 2f
-        var bottom = centerY + finalHeight / 2f
+        var left = box.left - expandLeft
+        var right = box.right + expandRight
+        var top = box.top - expandTop
+        var bottom = box.bottom + expandBottom
 
         val screenWidth = screenSize.first
         val screenHeight = screenSize.second

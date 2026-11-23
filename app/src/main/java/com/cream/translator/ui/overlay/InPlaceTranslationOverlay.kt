@@ -93,8 +93,37 @@ class InPlaceTranslationOverlay
                     ?: TextInpainter.calculateContrastingTextColor(bgColor)
             textPaint.color = textColor
 
+            val targetBox =
+                TextInpainter.BoxCoordinates(
+                    rect.left.toFloat(),
+                    rect.top.toFloat(),
+                    rect.right.toFloat(),
+                    rect.bottom.toFloat(),
+                )
+
+            // Gather other bounding boxes to calculate collision-free expansion limits
+            val otherBoxes =
+                results.mapNotNull { other ->
+                    if (other.region.id != item.region.id) {
+                        val ob = other.region.boundingBox
+                        TextInpainter.BoxCoordinates(
+                            ob.left.toFloat(),
+                            ob.top.toFloat(),
+                            ob.right.toFloat(),
+                            ob.bottom.toFloat(),
+                        )
+                    } else {
+                        null
+                    }
+                }
+            val constraints =
+                TextInpainter.calculateCollisionFreeExpansion(
+                    targetBox = targetBox,
+                    otherBoxes = otherBoxes,
+                    safetyMargin = 3f * density,
+                )
+
             // Calculate starting font size
-            val targetContentWidth = maxOf(20, (rect.width() - 2f * padX).toInt())
             var currentSp =
                 TextInpainter.calculateOptimalFontSize(
                     rect.width(),
@@ -103,6 +132,19 @@ class InPlaceTranslationOverlay
                     density,
                 )
             textPaint.textSize = currentSp * density
+
+            // For single-line labels or buttons, allow safe horizontal expansion if room permits
+            val isSingleLine = rect.height() < 42f * density
+            val baseContentWidth = maxOf(20f, rect.width() - 2f * padX)
+            val targetContentWidth =
+                if (isSingleLine) {
+                    val naturalTextWidth = textPaint.measureText(displayText)
+                    val maxSafeWidth = baseContentWidth + constraints.maxExpandLeft + constraints.maxExpandRight
+                    naturalTextWidth.coerceIn(baseContentWidth, maxSafeWidth).toInt()
+                } else {
+                    baseContentWidth.toInt()
+                }
+
             var staticLayout = createStaticLayout(displayText, targetContentWidth)
 
             // Downscale font size if rendered text exceeds bounding box height
@@ -113,16 +155,10 @@ class InPlaceTranslationOverlay
                 staticLayout = createStaticLayout(displayText, targetContentWidth)
             }
 
-            // Compute adaptive plate bounds that expand if rendered text still exceeds original box
+            // Compute adaptive plate bounds that respect neighboring box boundaries
             val plateBounds =
                 TextInpainter.computePlateBounds(
-                    box =
-                        TextInpainter.BoxCoordinates(
-                            rect.left.toFloat(),
-                            rect.top.toFloat(),
-                            rect.right.toFloat(),
-                            rect.bottom.toFloat(),
-                        ),
+                    box = targetBox,
                     textSize = Pair(staticLayout.width.toFloat(), staticLayout.height.toFloat()),
                     padding = Pair(padX, padY),
                     screenSize =
@@ -130,6 +166,7 @@ class InPlaceTranslationOverlay
                             width.toFloat().takeIf { it > 0 } ?: Float.MAX_VALUE,
                             height.toFloat().takeIf { it > 0 } ?: Float.MAX_VALUE,
                         ),
+                    constraints = constraints,
                 )
             val plateRectF = RectF(plateBounds.left, plateBounds.top, plateBounds.right, plateBounds.bottom)
             renderedPlates[item.region.id] = plateRectF
