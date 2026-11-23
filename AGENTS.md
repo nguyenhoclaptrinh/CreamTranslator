@@ -12,9 +12,10 @@ Tài liệu này là chỉ dẫn hệ thống bắt buộc dành cho mọi AI co
   Enhanced prompt: [Phiên bản prompt tiếng Anh/Việt được viết lại rõ ràng, sửa lỗi chính tả và ngữ pháp nhưng giữ nguyên ý định gốc].
   ```
 - **Bảo toàn thuật ngữ chuyên ngành chuẩn**: Giữ nguyên các thuật ngữ kỹ thuật phổ biến trong kỹ thuật phần mềm và hệ sinh thái Android, tránh dịch gượng ép gây khó hiểu (ví dụ: `CI/CD`, `PR`, `commit`, `merge`, `rebase`, `branch`, `build`, `coroutine`, `bitmap`, `lifecycle`, `foreground service`, `overlay`, `workflow`, `lint`, `spotless`, `detekt`, `unit test`, `memory leak`).
-- **Phong cách giao tiếp**:
+- **Phong cách giao tiếp & Định dạng**:
   - Trực tiếp, chính xác, súc tích và có tính hành động cao.
-  - Tuyệt đối không dùng ngôn ngữ cảm thán thái quá, tâng bốc, xin lỗi rườm rà hay biểu tượng cảm xúc (emoji) trang trí.
+  - Tuyệt đối không dùng ngôn ngữ cảm thán thái quá, tâng bốc, xin lỗi rườm rà.
+  - Tuyệt đối không dùng biểu tượng cảm xúc (emoji) hoặc ký tự trang trí ở bất kỳ đâu (bao gồm câu trả lời, commit message, tài liệu hướng dẫn, và nội dung summary của CI/CD workflow).
   - Báo cáo dựa trên kết quả quan sát thực tế và dữ liệu log, không suy đoán vô căn cứ.
 
 ---
@@ -34,6 +35,10 @@ Tài liệu này là chỉ dẫn hệ thống bắt buộc dành cho mọi AI co
    - **Tuyệt đối không push trực tiếp lên `main`**.
    - Mọi thay đổi đều phải được thực hiện trên feature/fix branch và đưa vào qua Pull Request (PR) nhắm vào `main`.
    - Mỗi commit phải tuân thủ chuẩn **Conventional Commits** (`feat:`, `fix:`, `perf:`, `docs:`, `refactor:`, `test:`, `ci:`).
+   - **Quy chuẩn đồng bộ nhánh (Branch Freshness & Conflict Prevention)**:
+     - Trước khi tạo PR: Bắt buộc pull/merge `origin/main` mới nhất vào nhánh hiện tại và giải quyết triệt để mọi xung đột cục bộ.
+     - Trong khi PR đang mở: Nếu `main` có commit mới, bắt buộc phải cập nhật nhánh PR bằng `gh pr update-branch` hoặc merge `main` để CI chạy trên base commit mới nhất.
+     - PR chỉ đủ điều kiện bàn giao khi `mergeable` ở trạng thái sạch (clean mergeable) và toàn bộ CI trên commit mới nhất đạt trạng thái pass.
    - **Bất biến về quyền Merge PR**:
      - Agent **CHỈ ĐƯỢC PHÉP** tạo PR, giám sát CI hoàn tất và báo cáo link PR kèm tóm tắt kỹ thuật cho người dùng.
      - **DỪNG LẠI TẠI ĐÂY** để người dùng trực tiếp review và đưa ra quyết định.
@@ -162,14 +167,21 @@ git checkout -b <type>/<ten-tinh-nang-ngan-gon>
 git add .
 git commit -m "<type>(<pham-vi>): <mo-ta-ngan-gon-bang-tieng-anh-hoac-viet>"
 
-# 6. Đẩy nhánh lên remote và mở Pull Request
+# 6. Đồng bộ nhánh với main mới nhất trước khi mở PR
+git fetch origin main
+git merge origin/main
+
+# 7. Đẩy nhánh lên remote và mở Pull Request
 git push -u origin <type>/<ten-tinh-nang-ngan-gon>
 gh pr create --title "<type>(<pham-vi>): <tieu-de>" --body "<Mo-ta-chi-tiet-thay-doi>"
 
-# 7. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
+# 8. Đồng bộ nhánh nếu main có commit mới trong lúc chờ review
+gh pr update-branch <pr-number> || true
+
+# 9. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
 gh pr checks <pr-number> --watch
 
-# 8. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
+# 10. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
 # TUYỆT ĐỐI KHÔNG tự chạy 'gh pr merge' trừ khi có lệnh tường minh từ người dùng!
 ```
 
