@@ -1,5 +1,6 @@
 package com.cream.translator.update
 
+import com.cream.translator.BuildConfig
 import com.cream.translator.core.model.error.CreamError
 import com.cream.translator.update.model.AppReleaseInfo
 import com.cream.translator.update.model.DownloadState
@@ -21,8 +22,8 @@ import java.net.URL
 import java.net.UnknownHostException
 
 class UpdateEngine(
-    private val repoOwner: String = "nguyenhoclaptrinh",
-    private val repoName: String = "CreamTranslator",
+    private val repoOwner: String = BuildConfig.GITHUB_REPO_OWNER,
+    private val repoName: String = BuildConfig.GITHUB_REPO_NAME,
 ) {
     suspend fun checkForUpdate(currentVersionName: String): Result<AppReleaseInfo?> =
         withContext(Dispatchers.IO) {

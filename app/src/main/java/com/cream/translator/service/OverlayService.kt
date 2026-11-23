@@ -33,6 +33,7 @@ import com.cream.translator.core.model.TranslationState
 import com.cream.translator.core.model.error.CreamError
 import com.cream.translator.core.util.createNamedExceptionHandler
 import com.cream.translator.ui.overlay.InPlaceTranslationOverlay
+import com.cream.translator.ui.overlay.OverlayConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,9 +70,9 @@ class OverlayService : Service() {
 
     private val ocrEngine = MlKitOcrEngine()
     private val translationEngine = MlKitTranslationEngine()
-
     private val _state = MutableStateFlow<TranslationState>(TranslationState.Idle)
     val state: StateFlow<TranslationState> = _state.asStateFlow()
+    private var currentLanguagePair = LanguagePair("en", "vi")
 
     private val systemEventsReceiver =
         object : BroadcastReceiver() {
@@ -126,6 +127,10 @@ class OverlayService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        val source = intent?.getStringExtra(EXTRA_SOURCE_LANG) ?: "en"
+        val target = intent?.getStringExtra(EXTRA_TARGET_LANG) ?: "vi"
+        currentLanguagePair = LanguagePair(source, target)
+        Timber.d("OverlayService started with language pair: %s", currentLanguagePair.displayName)
         return START_NOT_STICKY
     }
 
@@ -163,7 +168,7 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
-        val size = (52 * resources.displayMetrics.density).toInt()
+        val size = (OverlayConfig.TRIGGER_SIZE_DP * resources.displayMetrics.density).toInt()
 
         triggerParams =
             WindowManager.LayoutParams(
@@ -175,8 +180,8 @@ class OverlayService : Service() {
                 PixelFormat.TRANSLUCENT,
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = 24
-                y = 400
+                x = OverlayConfig.TRIGGER_DEFAULT_X
+                y = OverlayConfig.TRIGGER_DEFAULT_Y
             }
 
         // Stylish circular floating trigger button with brand vector icon
@@ -203,7 +208,7 @@ class OverlayService : Service() {
         if (attached) {
             floatingTriggerView = triggerButton
             Timber.d("Floating trigger attached successfully")
-            Toast.makeText(this, "CreamTranslator: Đã kích hoạt nút dịch nổi", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.overlay_trigger_enabled), Toast.LENGTH_SHORT).show()
         } else {
             Timber.e("Failed to attach floating overlay view")
         }
@@ -278,7 +283,9 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - initialTouchX).toInt()
                     val dy = (event.rawY - initialTouchY).toInt()
-                    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
+                    if (Math.abs(dx) > OverlayConfig.TRIGGER_DRAG_THRESHOLD ||
+                        Math.abs(dy) > OverlayConfig.TRIGGER_DRAG_THRESHOLD
+                    ) {
                         isClick = false
                         longPressJob?.cancel()
                     }
@@ -322,7 +329,7 @@ class OverlayService : Service() {
 
         val currentState = _state.value
         if (currentState is TranslationState.Capturing || currentState is TranslationState.Processing) {
-            Toast.makeText(this, "Đang xử lý, vui lòng chờ...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.overlay_processing_wait), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -331,14 +338,19 @@ class OverlayService : Service() {
             try {
                 // 1. Ẩn nút nổi tạm thời để không bị dính vào ảnh chụp màn hình
                 floatingTriggerView?.visibility = View.INVISIBLE
-                delay(60)
+                delay(OverlayConfig.TRIGGER_HIDE_DELAY_MS)
 
                 // 2. Chụp khung hình màn hình hiện tại
                 val captureService = ScreenCaptureService.instance
                 if (captureService == null) {
                     val err = CreamError.CaptureError.PermissionDenied()
                     _state.value = TranslationState.Error(err)
-                    Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@OverlayService,
+                        getString(R.string.overlay_capture_not_ready),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    floatingTriggerView?.visibility = View.VISIBLE
                     return@launch
                 }
 
@@ -348,7 +360,11 @@ class OverlayService : Service() {
                 if (bitmap == null) {
                     val err = CreamError.CaptureError.FrameAcquireTimeout()
                     _state.value = TranslationState.Error(err)
-                    Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@OverlayService,
+                        getString(R.string.overlay_capture_failed),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     return@launch
                 }
 
@@ -357,7 +373,7 @@ class OverlayService : Service() {
                         _state.value = TranslationState.Processing("OCR")
                         Toast.makeText(
                             this@OverlayService,
-                            "Đang nhận diện văn bản...",
+                            getString(R.string.overlay_ocr_recognizing),
                             Toast.LENGTH_SHORT,
                         ).show()
 
@@ -370,25 +386,31 @@ class OverlayService : Service() {
                         if (textRegions.isEmpty()) {
                             val err = CreamError.OcrError.ZeroRegionsDetected()
                             _state.value = TranslationState.Error(err)
-                            Toast.makeText(this@OverlayService, err.userFriendlyMessage, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this@OverlayService,
+                                getString(R.string.overlay_ocr_no_text),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             return@launch
                         }
 
                         _state.value = TranslationState.Processing("Translate")
                         Toast.makeText(
                             this@OverlayService,
-                            "Đang dịch ${textRegions.size} khối chữ...",
+                            getString(R.string.overlay_translating_blocks, textRegions.size),
                             Toast.LENGTH_SHORT,
                         ).show()
 
                         // 4. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
                         withContext(Dispatchers.Default) {
+                            val startTime = System.currentTimeMillis()
                             val textsToTranslate = textRegions.map { it.originalText }
                             val translatedTexts =
                                 translationEngine.translateBatch(
                                     textsToTranslate,
-                                    LanguagePair("en", "vi"),
+                                    currentLanguagePair,
                                 )
+                            val duration = System.currentTimeMillis() - startTime
 
                             textRegions.mapIndexed { index, region ->
                                 val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
@@ -401,6 +423,7 @@ class OverlayService : Service() {
                                 TranslationResult(
                                     region = enrichedRegion,
                                     translatedText = translatedTexts.getOrElse(index) { region.originalText },
+                                    executionTimeMs = duration,
                                 )
                             }
                         }
@@ -419,7 +442,11 @@ class OverlayService : Service() {
                 Timber.e(e, "Lỗi trong quá trình dịch màn hình")
                 val err = CreamError.TranslationError.InferenceFailed(e)
                 _state.value = TranslationState.Error(err)
-                Toast.makeText(this@OverlayService, "Lỗi xử lý: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@OverlayService,
+                    getString(R.string.overlay_error_prefix, e.message ?: ""),
+                    Toast.LENGTH_SHORT,
+                ).show()
             } finally {
                 floatingTriggerView?.visibility = View.VISIBLE
                 if (_state.value is TranslationState.Capturing || _state.value is TranslationState.Processing) {
@@ -476,11 +503,7 @@ class OverlayService : Service() {
         if (added) {
             inPlaceOverlay = overlayView
             isOverlayShowing = true
-            Toast.makeText(
-                this,
-                "Chạm vào chữ để đổi bản gốc/dịch. Chạm ra ngoài để đóng.",
-                Toast.LENGTH_LONG,
-            ).show()
+            Toast.makeText(this, getString(R.string.overlay_tap_hint), Toast.LENGTH_LONG).show()
         } else {
             Timber.e("Không thể gắn lớp phủ dịch đè lên màn hình")
             _state.value = TranslationState.Error(CreamError.OverlayError.WindowAttachmentFailed())
@@ -582,5 +605,7 @@ class OverlayService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.cream.translator.action.STOP_OVERLAY"
+        const val EXTRA_SOURCE_LANG = "extra_source_lang"
+        const val EXTRA_TARGET_LANG = "extra_target_lang"
     }
 }

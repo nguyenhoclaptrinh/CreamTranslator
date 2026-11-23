@@ -3,6 +3,7 @@ package com.cream.translator.core.engine
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import com.cream.translator.ui.overlay.OverlayConfig
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -103,7 +104,9 @@ object TextInpainter {
         textLength: Int,
         density: Float = 2.0f,
     ): Float {
-        if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0 || density <= 0f) return 14f
+        if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0 || density <= 0f) {
+            return OverlayConfig.DEFAULT_FONT_SIZE_SP
+        }
 
         val safeDensity = if (density <= 0f) 1.0f else density
         val boxHeightDp = boxHeight / safeDensity
@@ -118,7 +121,7 @@ object TextInpainter {
         val maxFontPerLine = (boxHeightDp / estimatedLines) * 0.85f
 
         val bestSize = min(sizeFromArea, maxFontPerLine)
-        return bestSize.coerceIn(10f, 28f)
+        return bestSize.coerceIn(OverlayConfig.MIN_FONT_SIZE_SP, OverlayConfig.MAX_FONT_SIZE_SP)
     }
 
     data class BoxCoordinates(

@@ -40,8 +40,8 @@ class InPlaceTranslationOverlay
         private val borderPaint =
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
-                strokeWidth = 2f
-                color = Color.parseColor("#80FFFFFF")
+                strokeWidth = OverlayConfig.OVERLAY_BORDER_WIDTH
+                color = Color.parseColor(OverlayConfig.OVERLAY_BORDER_COLOR)
             }
 
         init {
@@ -85,7 +85,7 @@ class InPlaceTranslationOverlay
             val isShowingOriginal = toggledRegions.contains(item.region.id)
             val displayText = if (isShowingOriginal) item.region.originalText else item.translatedText
 
-            val bgColor = item.region.backgroundColor ?: Color.parseColor("#EE1E1E1E")
+            val bgColor = item.region.backgroundColor ?: Color.parseColor(OverlayConfig.OVERLAY_BG_COLOR)
             bgPaint.color = bgColor
 
             val textColor =
