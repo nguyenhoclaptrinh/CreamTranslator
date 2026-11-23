@@ -28,10 +28,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: |
+          ./gradlew assembleRelease
+          mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk dist/CreamTranslator-v1.0.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: dist/CreamTranslator-v1.0.0.apk
           generate_release_notes: true
