@@ -1,0 +1,17 @@
+#!/bin/sh
+# Git Pre-commit hook for CreamTranslator
+# Ensures code formatting, static analysis, and conventional commits
+
+echo "[HOOK] Running pre-commit static analysis and formatting checks..."
+
+if [ -f "./gradlew" ]; then
+    ./gradlew spotlessCheck detekt --daemon
+    RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        echo "[ERROR] Pre-commit quality checks failed! Please run './gradlew spotlessApply' and fix detekt issues before committing."
+        exit 1
+    fi
+fi
+
+echo "[HOOK] Pre-commit checks passed successfully."
+exit 0

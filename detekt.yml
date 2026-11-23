@@ -1,0 +1,28 @@
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+complexity:
+  TooManyFunctions:
+    maxFunctions: 20
+  LongMethod:
+    threshold: 60
+  ComplexCondition:
+    threshold: 4
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true
+    exceptions:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - NullPointerException
+      - Throwable
+
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '^[a-z][a-zA-Z0-9]*$'
+  VariableNaming:
+    active: true
+    variablePattern: '^[a-z][a-zA-Z0-9]*$'

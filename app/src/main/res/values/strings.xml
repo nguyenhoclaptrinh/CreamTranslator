@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">CreamTranslator</string>
+    <string name="notification_channel_name">Screen Translation Service</string>
+    <string name="notification_channel_desc">Active screen capture and translation overlay</string>
+    <string name="notification_title">CreamTranslator is active</string>
+    <string name="notification_text">Tap the floating widget to translate screen</string>
+</resources>
