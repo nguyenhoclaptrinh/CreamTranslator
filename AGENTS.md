@@ -43,10 +43,11 @@ The project enforces an automated **Fail-Fast Tiered Verification Model** in Git
   - `Build Assemble Debug APK`: Mounts a 2GB `tmpfs` RAM disk and runs `./gradlew assembleDebug -x test -x lint` in ~1m30s.
 
 ### Automated Continuous Delivery (`.github/workflows/release.yml`)
-- Triggers automatically upon squash-merging into `main`.
+- Triggers intentionally on Git tags (`v*.*.*`) or via manual `workflow_dispatch`.
+- Ordinary PR merges into `main` do not cut releases, preventing version inflation.
 - Streamlined single job on RAM Disk `tmpfs` (~1m24s):
   - Compiles release APK (`assembleRelease`).
-  - Reads monotonic version from Gradle (`printAppVersion`).
+  - Reads semantic version from Gradle (`printAppVersion`).
   - Generates SHA-256 verification hash: `CreamTranslator-v<version>.apk.sha256`.
   - Publishes official release to GitHub Releases with attached binary and checksum assets.
 
@@ -59,17 +60,19 @@ Do **not** hardcode version strings in shell scripts or Kotlin files.
 - **Single Source of Truth**: Defined in [gradle.properties](file:///d:/Workspaces/Tools/CreamTranslator/gradle.properties):
   ```properties
   appVersionMajor=1
-  appVersionMinor=0
+  appVersionMinor=1
+  appVersionPatch=0
   ```
-- **Monotonic Version Code**:
+- **Semantic Version Code**:
   ```kotlin
-  val appVersionCode = (major * 10000) + (minor * 1000) + GITHUB_RUN_NUMBER
+  val appVersionCode = (major * 10000) + (minor * 1000) + patch
   ```
-  Strictly monotonically increases with every CI build to avoid Android OS `INSTALL_FAILED_VERSION_DOWNGRADE` errors.
+  Monotonically increases with semantic version releases.
 - **Semantic Version Name**:
   ```kotlin
-  val appVersionName = "$major.$minor.$GITHUB_RUN_NUMBER"
+  val appVersionName = "$major.$minor.$patch"
   ```
+  Debug builds receive `-debug` suffix (`1.1.0-debug`).
 - Query version locally/in scripts via Gradle:
   ```bash
   ./gradlew -q printAppVersion
