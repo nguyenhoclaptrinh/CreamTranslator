@@ -8,11 +8,13 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 object TextInpainter {
-
     /**
      * Samples pixels around the bounding box perimeter to find the dominant background color.
      */
-    fun sampleBackgroundColor(bitmap: Bitmap, box: Rect): Int {
+    fun sampleBackgroundColor(
+        bitmap: Bitmap,
+        box: Rect,
+    ): Int {
         val width = bitmap.width
         val height = bitmap.height
 
@@ -85,7 +87,7 @@ object TextInpainter {
         boxWidth: Int,
         boxHeight: Int,
         textLength: Int,
-        density: Float = 2.0f
+        density: Float = 2.0f,
     ): Float {
         if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0) return 14f
 

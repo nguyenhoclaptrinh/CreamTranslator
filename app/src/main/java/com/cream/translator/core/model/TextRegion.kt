@@ -8,5 +8,5 @@ data class TextRegion(
     val boundingBox: Rect,
     val confidence: Float = 1.0f,
     val backgroundColor: Int? = null,
-    val textColor: Int? = null
+    val textColor: Int? = null,
 )

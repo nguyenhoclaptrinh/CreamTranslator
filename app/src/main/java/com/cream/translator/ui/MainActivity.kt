@@ -30,7 +30,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -41,30 +40,32 @@ import com.cream.translator.service.ScreenCaptureService
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-
     private val translationEngine = MlKitTranslationEngine()
 
-    private val overlayPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        checkPermissions()
-    }
-
-    private val screenCaptureLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
-                putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
-                putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, result.data)
-            }
-            startForegroundService(serviceIntent)
-            startService(Intent(this, OverlayService::class.java))
-            Toast.makeText(this, "Screen Translator Started", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Screen capture permission denied", Toast.LENGTH_SHORT).show()
+    private val overlayPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            checkPermissions()
         }
-    }
+
+    private val screenCaptureLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                val serviceIntent =
+                    Intent(this, ScreenCaptureService::class.java).apply {
+                        putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                        putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, result.data)
+                    }
+                startForegroundService(serviceIntent)
+                startService(Intent(this, OverlayService::class.java))
+                Toast.makeText(this, "Screen Translator Started", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Screen capture permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private var hasOverlayPermission by mutableStateOf(false)
 
@@ -85,7 +86,7 @@ class MainActivity : ComponentActivity() {
                                 val success = translationEngine.ensureModelDownloaded(pair)
                                 onComplete(success)
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -97,10 +98,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestOverlayPermission() {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName")
-        )
+        val intent =
+            Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName"),
+            )
         overlayPermissionLauncher.launch(intent)
     }
 
@@ -110,8 +112,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun lifecycleScopeLaunch(block: suspend () -> Unit) {
-        val scope = (this as androidx.lifecycle.LifecycleOwner)
-        // Coroutine launch in lifecycle
         kotlinx.coroutines.MainScope().launch {
             block()
         }
@@ -128,9 +128,8 @@ fun TranslatorDashboard(
     hasOverlayPermission: Boolean,
     onRequestOverlayPermission: () -> Unit,
     onStartService: () -> Unit,
-    onDownloadModel: (LanguagePair, (Boolean) -> Unit) -> Unit
+    onDownloadModel: (LanguagePair, (Boolean) -> Unit) -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     var isModelReady by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
 
@@ -143,32 +142,41 @@ fun TranslatorDashboard(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = "CreamTranslator",
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.headlineMedium,
         )
         Text(
             text = "Zero-Cost On-Device Screen Translator for Games",
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
         )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "System Status",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "• Overlay Permission: ${if (hasOverlayPermission) "Granted" else "Missing"}")
-                Text(text = "• Offline EN-VI Model: ${if (isModelReady) "Ready (Offline)" else if (isDownloading) "Downloading..." else "Not Ready"}")
+                Text(
+                    text = "• Offline EN-VI Model: ${if (isModelReady) {
+                        "Ready (Offline)"
+                    } else if (isDownloading) {
+                        "Downloading..."
+                    } else {
+                        "Not Ready"
+                    }}",
+                )
                 Text(text = "• Anti-Cheat Safe: Verified (Zero Accessibility)")
             }
         }
@@ -176,7 +184,7 @@ fun TranslatorDashboard(
         if (!hasOverlayPermission) {
             Button(
                 onClick = onRequestOverlayPermission,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Grant Overlay Permission")
             }
@@ -184,7 +192,7 @@ fun TranslatorDashboard(
             Button(
                 onClick = onStartService,
                 enabled = isModelReady,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Start Translator Service")
             }
@@ -198,7 +206,7 @@ fun TranslatorDashboard(
                     isDownloading = false
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Re-verify Offline Model")
         }

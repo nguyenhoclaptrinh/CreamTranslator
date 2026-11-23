@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TextInpainterTest {
-
     @Test
     fun calculateContrastingTextColor_withDarkBackground_returnsWhite() {
         val darkColor = Color.rgb(20, 20, 20)
@@ -24,12 +23,13 @@ class TextInpainterTest {
     @Test
     fun calculateOptimalFontSize_withinExpectedBounds() {
         // Standard game dialogue box dimensions (e.g. 400x100)
-        val fontSize = TextInpainter.calculateOptimalFontSize(
-            boxWidth = 400,
-            boxHeight = 100,
-            textLength = 40,
-            density = 2.0f
-        )
+        val fontSize =
+            TextInpainter.calculateOptimalFontSize(
+                boxWidth = 400,
+                boxHeight = 100,
+                textLength = 40,
+                density = 2.0f,
+            )
 
         // Must be clamped within mobile game readability threshold (10sp to 28sp)
         assertTrue(fontSize in 10.0f..28.0f)

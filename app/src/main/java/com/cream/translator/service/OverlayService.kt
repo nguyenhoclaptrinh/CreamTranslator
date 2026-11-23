@@ -31,7 +31,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 class OverlayService : Service() {
-
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var windowManager: WindowManager? = null
 
@@ -55,43 +54,47 @@ class OverlayService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupFloatingTrigger() {
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val layoutType =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
 
         val size = (52 * resources.displayMetrics.density).toInt()
 
-        triggerParams = WindowManager.LayoutParams(
-            size,
-            size,
-            layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 24
-            y = 400
-        }
+        triggerParams =
+            WindowManager.LayoutParams(
+                size,
+                size,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = 24
+                y = 400
+            }
 
         // Stylish circular floating trigger button with "CT" brand text
-        val triggerButton = TextView(this).apply {
-            text = "CT"
-            textSize = 18f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
+        val triggerButton =
+            TextView(this).apply {
+                text = "CT"
+                textSize = 18f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
 
-            val bg = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#EE0084FF"))
-                setStroke((2 * resources.displayMetrics.density).toInt(), Color.WHITE)
+                val bg =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#EE0084FF"))
+                        setStroke((2 * resources.displayMetrics.density).toInt(), Color.WHITE)
+                    }
+                background = bg
+                elevation = 12f
             }
-            background = bg
-            elevation = 12f
-        }
 
         attachDragAndClickListener(triggerButton, triggerParams!!)
 
@@ -105,7 +108,10 @@ class OverlayService : Service() {
         }
     }
 
-    private fun attachDragAndClickListener(view: View, params: WindowManager.LayoutParams) {
+    private fun attachDragAndClickListener(
+        view: View,
+        params: WindowManager.LayoutParams,
+    ) {
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
@@ -165,7 +171,11 @@ class OverlayService : Service() {
                 // 2. Chụp khung hình màn hình hiện tại
                 val captureService = ScreenCaptureService.instance
                 if (captureService == null) {
-                    Toast.makeText(this@OverlayService, "Dịch vụ chụp màn hình chưa sẵn sàng", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@OverlayService,
+                        "Dịch vụ chụp màn hình chưa sẵn sàng",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     floatingTriggerView?.visibility = View.VISIBLE
                     isProcessing = false
                     return@launch
@@ -175,7 +185,11 @@ class OverlayService : Service() {
                 floatingTriggerView?.visibility = View.VISIBLE
 
                 if (bitmap == null) {
-                    Toast.makeText(this@OverlayService, "Không thể chụp màn hình (hoặc màn hình được bảo mật)", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@OverlayService,
+                        "Không thể chụp màn hình (hoặc màn hình được bảo mật)",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                     isProcessing = false
                     return@launch
                 }
@@ -183,9 +197,10 @@ class OverlayService : Service() {
                 Toast.makeText(this@OverlayService, "Đang nhận diện văn bản...", Toast.LENGTH_SHORT).show()
 
                 // 3. Chạy OCR On-Device bằng ML Kit
-                val textRegions = withContext(Dispatchers.Default) {
-                    ocrEngine.recognizeText(bitmap)
-                }
+                val textRegions =
+                    withContext(Dispatchers.Default) {
+                        ocrEngine.recognizeText(bitmap)
+                    }
 
                 if (textRegions.isEmpty()) {
                     Toast.makeText(this@OverlayService, "Không tìm thấy chữ trên màn hình", Toast.LENGTH_SHORT).show()
@@ -193,33 +208,39 @@ class OverlayService : Service() {
                     return@launch
                 }
 
-                Toast.makeText(this@OverlayService, "Đang dịch ${textRegions.size} khối chữ...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@OverlayService,
+                    "Đang dịch ${textRegions.size} khối chữ...",
+                    Toast.LENGTH_SHORT,
+                ).show()
 
                 // 4. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
-                val results = withContext(Dispatchers.Default) {
-                    val textsToTranslate = textRegions.map { it.originalText }
-                    val translatedTexts = translationEngine.translateBatch(
-                        textsToTranslate,
-                        LanguagePair("en", "vi")
-                    )
+                val results =
+                    withContext(Dispatchers.Default) {
+                        val textsToTranslate = textRegions.map { it.originalText }
+                        val translatedTexts =
+                            translationEngine.translateBatch(
+                                textsToTranslate,
+                                LanguagePair("en", "vi"),
+                            )
 
-                    textRegions.mapIndexed { index, region ->
-                        val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
-                        val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
-                        val enrichedRegion = region.copy(
-                            backgroundColor = sampledBg,
-                            textColor = contrastingText
-                        )
-                        TranslationResult(
-                            region = enrichedRegion,
-                            translatedText = translatedTexts.getOrElse(index) { region.originalText }
-                        )
+                        textRegions.mapIndexed { index, region ->
+                            val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
+                            val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
+                            val enrichedRegion =
+                                region.copy(
+                                    backgroundColor = sampledBg,
+                                    textColor = contrastingText,
+                                )
+                            TranslationResult(
+                                region = enrichedRegion,
+                                translatedText = translatedTexts.getOrElse(index) { region.originalText },
+                            )
+                        }
                     }
-                }
 
                 // 5. Hiển thị lớp phủ dịch đè trực tiếp (In-Place Translation Overlay)
                 displayTranslationOverlay(results)
-
             } catch (e: Exception) {
                 Timber.e(e, "Lỗi trong quá trình dịch màn hình")
                 Toast.makeText(this@OverlayService, "Lỗi xử lý: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -235,29 +256,32 @@ class OverlayService : Service() {
             dismissTranslationOverlay()
         }
 
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
-
-        val overlayParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        )
-
-        val overlayView = InPlaceTranslationOverlay(this).apply {
-            setResults(results)
-            onDismissListener = {
-                dismissTranslationOverlay()
+        val layoutType =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
             }
-        }
+
+        val overlayParams =
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            )
+
+        val overlayView =
+            InPlaceTranslationOverlay(this).apply {
+                setResults(results)
+                onDismissListener = {
+                    dismissTranslationOverlay()
+                }
+            }
 
         try {
             windowManager?.addView(overlayView, overlayParams)

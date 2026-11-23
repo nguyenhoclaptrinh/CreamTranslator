@@ -18,7 +18,7 @@ import java.nio.ByteBuffer
 
 class ScreenCaptureManager(
     private val context: Context,
-    private val mediaProjection: MediaProjection
+    private val mediaProjection: MediaProjection,
 ) {
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -44,70 +44,74 @@ class ScreenCaptureManager(
     @SuppressLint("WrongConstant")
     private fun setupVirtualDisplay() {
         imageReader?.close()
-        imageReader = ImageReader.newInstance(
-            screenWidth,
-            screenHeight,
-            PixelFormat.RGBA_8888,
-            2
-        )
+        imageReader =
+            ImageReader.newInstance(
+                screenWidth,
+                screenHeight,
+                PixelFormat.RGBA_8888,
+                2,
+            )
 
         virtualDisplay?.release()
-        virtualDisplay = mediaProjection.createVirtualDisplay(
-            "ScreenCaptureVirtualDisplay",
-            screenWidth,
-            screenHeight,
-            screenDensity,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface,
-            null,
-            null
-        )
+        virtualDisplay =
+            mediaProjection.createVirtualDisplay(
+                "ScreenCaptureVirtualDisplay",
+                screenWidth,
+                screenHeight,
+                screenDensity,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader?.surface,
+                null,
+                null,
+            )
         Timber.d("VirtualDisplay initialized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
     }
 
-    suspend fun captureFrame(): Bitmap? = withContext(Dispatchers.Default) {
-        val reader = imageReader ?: return@withContext null
-        var image: Image? = null
-        try {
-            image = reader.acquireLatestImage()
-            if (image == null) {
-                // Wait briefly for a frame to render
-                Thread.sleep(50)
+    suspend fun captureFrame(): Bitmap? =
+        withContext(Dispatchers.Default) {
+            val reader = imageReader ?: return@withContext null
+            var image: Image? = null
+            try {
                 image = reader.acquireLatestImage()
-            }
-            if (image == null) {
-                Timber.w("No frame captured from ImageReader")
-                return@withContext null
-            }
+                if (image == null) {
+                    // Wait briefly for a frame to render
+                    Thread.sleep(50)
+                    image = reader.acquireLatestImage()
+                }
+                if (image == null) {
+                    Timber.w("No frame captured from ImageReader")
+                    return@withContext null
+                }
 
-            val planes = image.planes
-            val buffer: ByteBuffer = planes[0].buffer
-            val pixelStride = planes[0].pixelStride
-            val rowStride = planes[0].rowStride
-            val rowPadding = rowStride - pixelStride * screenWidth
+                val planes = image.planes
+                val buffer: ByteBuffer = planes[0].buffer
+                val pixelStride = planes[0].pixelStride
+                val rowStride = planes[0].rowStride
+                val rowPadding = rowStride - pixelStride * screenWidth
 
-            val bitmap = Bitmap.createBitmap(
-                screenWidth + rowPadding / pixelStride,
-                screenHeight,
-                Bitmap.Config.ARGB_8888
-            )
-            bitmap.copyPixelsFromBuffer(buffer)
+                val bitmap =
+                    Bitmap.createBitmap(
+                        screenWidth + rowPadding / pixelStride,
+                        screenHeight,
+                        Bitmap.Config.ARGB_8888,
+                    )
+                bitmap.copyPixelsFromBuffer(buffer)
 
-            // Crop out padding if present
-            if (rowPadding == 0) {
-                bitmap
-            } else {
-                val cleanBitmap = Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight)
-                bitmap.recycle()
-                cleanBitmap
+                // Crop out padding if present
+                if (rowPadding == 0) {
+                    bitmap
+                } else {
+                    val cleanBitmap = Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight)
+                    bitmap.recycle()
+                    cleanBitmap
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error capturing screen frame")
+                null
+            } finally {
+                image?.close()
             }
-        } catch (e: Exception) {
-            Timber.e(e, "Error capturing screen frame")
-            null
-        } finally {
-            image?.close()
         }
-    }
 
     fun onConfigurationChanged() {
         updateScreenDimensions()

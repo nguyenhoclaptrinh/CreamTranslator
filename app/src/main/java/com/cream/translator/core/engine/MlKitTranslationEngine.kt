@@ -16,21 +16,23 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class MlKitTranslationEngine : TranslationEngine {
-
     private val translators = ConcurrentHashMap<String, Translator>()
 
     private fun getOrCreateTranslator(languagePair: LanguagePair): Translator {
         val key = "${languagePair.sourceLanguage}_${languagePair.targetLanguage}"
         return translators.getOrPut(key) {
-            val source = TranslateLanguage.fromLanguageTag(languagePair.sourceLanguage)
-                ?: TranslateLanguage.ENGLISH
-            val target = TranslateLanguage.fromLanguageTag(languagePair.targetLanguage)
-                ?: TranslateLanguage.VIETNAMESE
+            val source =
+                TranslateLanguage.fromLanguageTag(languagePair.sourceLanguage)
+                    ?: TranslateLanguage.ENGLISH
+            val target =
+                TranslateLanguage.fromLanguageTag(languagePair.targetLanguage)
+                    ?: TranslateLanguage.VIETNAMESE
 
-            val options = TranslatorOptions.Builder()
-                .setSourceLanguage(source)
-                .setTargetLanguage(target)
-                .build()
+            val options =
+                TranslatorOptions.Builder()
+                    .setSourceLanguage(source)
+                    .setTargetLanguage(target)
+                    .build()
 
             Translation.getClient(options)
         }
@@ -52,7 +54,10 @@ class MlKitTranslationEngine : TranslationEngine {
                 }
         }
 
-    override suspend fun translate(text: String, languagePair: LanguagePair): String =
+    override suspend fun translate(
+        text: String,
+        languagePair: LanguagePair,
+    ): String =
         suspendCancellableCoroutine { continuation ->
             if (text.isBlank()) {
                 continuation.resume("")
@@ -72,19 +77,20 @@ class MlKitTranslationEngine : TranslationEngine {
 
     override suspend fun translateBatch(
         texts: List<String>,
-        languagePair: LanguagePair
-    ): List<String> = coroutineScope {
-        texts.map { text ->
-            async {
-                try {
-                    translate(text, languagePair)
-                } catch (e: Exception) {
-                    Timber.w(e, "Fallback to original text due to translation error")
-                    text
+        languagePair: LanguagePair,
+    ): List<String> =
+        coroutineScope {
+            texts.map { text ->
+                async {
+                    try {
+                        translate(text, languagePair)
+                    } catch (e: Exception) {
+                        Timber.w(e, "Fallback to original text due to translation error")
+                        text
+                    }
                 }
-            }
-        }.awaitAll()
-    }
+            }.awaitAll()
+        }
 
     override fun close() {
         translators.values.forEach { translator ->

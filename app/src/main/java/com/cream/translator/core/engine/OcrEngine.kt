@@ -5,5 +5,6 @@ import com.cream.translator.core.model.TextRegion
 
 interface OcrEngine {
     suspend fun recognizeText(bitmap: Bitmap): List<TextRegion>
+
     fun close()
 }

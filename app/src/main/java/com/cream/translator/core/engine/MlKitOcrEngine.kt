@@ -12,7 +12,6 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class MlKitOcrEngine : OcrEngine {
-
     private val recognizer = TextRecognition.getClient()
 
     override suspend fun recognizeText(bitmap: Bitmap): List<TextRegion> =
@@ -32,8 +31,8 @@ class MlKitOcrEngine : OcrEngine {
                                         id = UUID.randomUUID().toString(),
                                         originalText = line.text.trim(),
                                         boundingBox = box,
-                                        confidence = 1.0f
-                                    )
+                                        confidence = 1.0f,
+                                    ),
                                 )
                             }
                         }
