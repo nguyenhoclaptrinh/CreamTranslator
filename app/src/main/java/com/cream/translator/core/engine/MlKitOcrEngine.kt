@@ -5,6 +5,7 @@ import android.graphics.Rect
 import com.cream.translator.core.model.TextRegion
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import timber.log.Timber
 import java.util.UUID
@@ -12,7 +13,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class MlKitOcrEngine : OcrEngine {
-    private val recognizer = TextRecognition.getClient()
+    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     override suspend fun recognizeText(bitmap: Bitmap): List<TextRegion> =
         suspendCancellableCoroutine { continuation ->
