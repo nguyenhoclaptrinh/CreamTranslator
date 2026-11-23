@@ -52,30 +52,25 @@ object TranslatorController {
         }
     }
 
+    private var isStopping = false
+
     /**
      * Dừng toàn bộ các dịch vụ dịch màn hình, gỡ bỏ các lớp phủ và thu hồi tài nguyên.
      */
     fun stop(context: Context) {
+        if (isStopping) return
+        isStopping = true
+        _isServiceRunning.value = false
         try {
-            _isServiceRunning.value = false
-
-            val stopCaptureIntent =
-                Intent(context, ScreenCaptureService::class.java).apply {
-                    action = ScreenCaptureService.ACTION_STOP
-                }
-            context.startService(stopCaptureIntent)
-            context.stopService(Intent(context, ScreenCaptureService::class.java))
-
-            val stopOverlayIntent =
-                Intent(context, OverlayService::class.java).apply {
-                    action = OverlayService.ACTION_STOP
-                }
-            context.startService(stopOverlayIntent)
+            // Dừng trực tiếp qua stopService để giải phóng vòng đời sạch sẽ, không khởi chạy lại service
             context.stopService(Intent(context, OverlayService::class.java))
+            context.stopService(Intent(context, ScreenCaptureService::class.java))
 
             Timber.i("TranslatorController: Đã gửi lệnh dừng toàn bộ dịch vụ phiên dịch")
         } catch (e: Throwable) {
             Timber.e(e, "TranslatorController: Lỗi khi dừng dịch vụ")
+        } finally {
+            isStopping = false
         }
     }
 }

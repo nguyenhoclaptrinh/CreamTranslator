@@ -274,10 +274,11 @@ class OverlayService : Service() {
                         serviceScope.launch {
                             delay(800)
                             if (isClick) {
+                                isClick = false
                                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                 Toast.makeText(
                                     this@OverlayService,
-                                    "CreamTranslator: Đã tắt dịch",
+                                    getString(R.string.toast_service_stopped),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                                 TranslatorController.stop(this@OverlayService)
