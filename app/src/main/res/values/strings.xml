@@ -21,6 +21,7 @@
     <!-- Buttons & Actions -->
     <string name="btn_grant_overlay_permission">Grant Overlay Permission</string>
     <string name="btn_start_service">Start Translator Service</string>
+    <string name="btn_stop_service">Stop Translator Service</string>
     <string name="btn_reverify_model">Re-verify Offline Model</string>
     <string name="btn_check_update">Check for Updates</string>
     <string name="btn_checking_update">Checking for updates…</string>
@@ -28,6 +29,7 @@
 
     <!-- Messages & Toasts -->
     <string name="msg_screen_translator_started">Screen Translator Started</string>
+    <string name="toast_service_stopped">CreamTranslator: Translation Stopped</string>
     <string name="msg_screen_capture_denied">Screen capture permission denied</string>
     <string name="msg_grant_install_unknown_sources">Please grant Install Unknown Apps permission</string>
 

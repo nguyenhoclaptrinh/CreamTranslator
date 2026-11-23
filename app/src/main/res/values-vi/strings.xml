@@ -21,6 +21,7 @@
     <!-- Buttons & Actions -->
     <string name="btn_grant_overlay_permission">Cấp quyền hiển thị trên ứng dụng khác</string>
     <string name="btn_start_service">Khởi chạy dịch vụ dịch</string>
+    <string name="btn_stop_service">Dừng dịch vụ dịch</string>
     <string name="btn_reverify_model">Kiểm tra lại gói dịch Offline</string>
     <string name="btn_check_update">Kiểm tra bản cập nhật</string>
     <string name="btn_checking_update">Đang kiểm tra cập nhật…</string>
@@ -28,6 +29,7 @@
 
     <!-- Messages & Toasts -->
     <string name="msg_screen_translator_started">Đã khởi chạy trình dịch màn hình</string>
+    <string name="toast_service_stopped">CreamTranslator: Đã tắt dịch</string>
     <string name="msg_screen_capture_denied">Quyền chụp màn hình bị từ chối</string>
     <string name="msg_grant_install_unknown_sources">Vui lòng cấp quyền Cài đặt ứng dụng không rõ nguồn</string>
 

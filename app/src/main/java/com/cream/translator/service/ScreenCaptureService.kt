@@ -44,7 +44,6 @@ class ScreenCaptureService : Service() {
     ): Int {
         if (intent?.action == ACTION_STOP) {
             Timber.i("ScreenCaptureService nhận lệnh ACTION_STOP")
-            TranslatorController.stop(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -150,6 +149,7 @@ class ScreenCaptureService : Service() {
 
     override fun onDestroy() {
         instance = null
+        captureManager?.onStopCallback = null
         captureManager?.release()
         captureManager = null
         mediaProjection?.stop()

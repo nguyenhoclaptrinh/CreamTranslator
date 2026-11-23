@@ -415,7 +415,7 @@ private fun TranslatorControlButtons(
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Stop Translator Service")
+            Text(stringResource(R.string.btn_stop_service))
         }
     } else {
         Button(

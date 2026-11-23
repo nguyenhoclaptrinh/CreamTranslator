@@ -1,6 +1,7 @@
 package com.cream.translator.core.engine.filter
 
 import com.cream.translator.core.model.FilterConfig
+import com.cream.translator.core.model.LanguagePair
 import java.util.Locale
 
 /**
@@ -11,7 +12,12 @@ class DefaultTextFilter(
 ) : TextFilter {
     constructor(staticConfig: FilterConfig) : this({ staticConfig })
 
-    override fun shouldFilter(text: String): Boolean {
+    override fun shouldFilter(text: String): Boolean = shouldFilter(text, null)
+
+    override fun shouldFilter(
+        text: String,
+        languagePair: LanguagePair?,
+    ): Boolean {
         val config = configProvider()
         if (!config.isFilteringEnabled) {
             return false
@@ -24,6 +30,11 @@ class DefaultTextFilter(
 
         // Bỏ qua các ký tự đơn lẻ chỉ là dấu câu hoặc ký hiệu toán học
         if (trimmed.length == 1 && !trimmed[0].isLetterOrDigit()) {
+            return true
+        }
+
+        // Kiểm tra tính không tương thích với ngôn ngữ hoặc đã là ngôn ngữ đích
+        if (languagePair != null && isLanguageIncompatibleOrAlreadyTarget(trimmed, languagePair)) {
             return true
         }
 
@@ -51,6 +62,62 @@ class DefaultTextFilter(
         }
 
         return false
+    }
+
+    private fun isLanguageIncompatibleOrAlreadyTarget(
+        text: String,
+        languagePair: LanguagePair,
+    ): Boolean {
+        val target = languagePair.targetLanguage.lowercase(Locale.ROOT)
+        val source = languagePair.sourceLanguage.lowercase(Locale.ROOT)
+
+        if (isAlreadyInTargetLanguage(text, target)) {
+            return true
+        }
+
+        return isIncompatibleWithSourceLanguage(text, source)
+    }
+
+    private fun isAlreadyInTargetLanguage(
+        text: String,
+        target: String,
+    ): Boolean {
+        return target == "vi" && VIETNAMESE_DIACRITICS_REGEX.containsMatchIn(text)
+    }
+
+    private fun isIncompatibleWithSourceLanguage(
+        text: String,
+        source: String,
+    ): Boolean {
+        return when (source) {
+            "en" -> hasNonEnglishScript(text)
+            "ja" -> isMissingJapaneseScript(text)
+            "zh" -> !CJK_IDEOGRAPH_REGEX.containsMatchIn(text) && isPureLatinOrVietnamese(text)
+            "ko" -> !HANGUL_REGEX.containsMatchIn(text) && isPureLatinOrVietnamese(text)
+            else -> false
+        }
+    }
+
+    private fun hasNonEnglishScript(text: String): Boolean {
+        return VIETNAMESE_DIACRITICS_REGEX.containsMatchIn(text) ||
+            CJK_IDEOGRAPH_REGEX.containsMatchIn(text) ||
+            JAPANESE_KANA_REGEX.containsMatchIn(text) ||
+            HANGUL_REGEX.containsMatchIn(text) ||
+            CYRILLIC_REGEX.containsMatchIn(text)
+    }
+
+    private fun isMissingJapaneseScript(text: String): Boolean {
+        val hasJapanese = JAPANESE_KANA_REGEX.containsMatchIn(text) || CJK_IDEOGRAPH_REGEX.containsMatchIn(text)
+        return !hasJapanese && isPureLatinOrVietnamese(text)
+    }
+
+    private fun isPureLatinOrVietnamese(text: String): Boolean {
+        val hasLetter = text.any { it.isLetter() }
+        val hasAsianScript =
+            CJK_IDEOGRAPH_REGEX.containsMatchIn(text) ||
+                JAPANESE_KANA_REGEX.containsMatchIn(text) ||
+                HANGUL_REGEX.containsMatchIn(text)
+        return hasLetter && !hasAsianScript
     }
 
     private fun normalizeForComparison(raw: String): String {
@@ -235,5 +302,25 @@ class DefaultTextFilter(
                 """^(https?://|www\.)\S+$|^[a-zA-Z0-9.-]+\.(com|org|net|io|edu|gov|vn|app|dev)$""",
                 RegexOption.IGNORE_CASE,
             )
+
+        private const val VI_LOWER =
+            "àáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ"
+        private const val VI_UPPER =
+            "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬĐÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴ"
+
+        private val VIETNAMESE_DIACRITICS_REGEX =
+            Regex("[$VI_LOWER$VI_UPPER]")
+
+        private val CJK_IDEOGRAPH_REGEX =
+            Regex("""[\u4e00-\u9fff]""")
+
+        private val JAPANESE_KANA_REGEX =
+            Regex("""[\u3040-\u309f\u30a0-\u30ff]""")
+
+        private val HANGUL_REGEX =
+            Regex("""[\uac00-\ud7af\u1100-\u11ff]""")
+
+        private val CYRILLIC_REGEX =
+            Regex("""[\u0400-\u04ff]""")
     }
 }
