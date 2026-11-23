@@ -40,4 +40,88 @@ class TextInpainterTest {
         val fontSize = TextInpainter.calculateOptimalFontSize(0, 0, 0)
         assertEquals(14.0f, fontSize, 0.01f)
     }
+
+    @Test
+    fun calculateOptimalFontSize_withNarrowSingleLine_clampsToReadableBounds() {
+        val fontSize =
+            TextInpainter.calculateOptimalFontSize(
+                boxWidth = 300,
+                boxHeight = 30,
+                textLength = 20,
+                density = 2.0f,
+            )
+        assertTrue(fontSize in 10.0f..28.0f)
+    }
+
+    @Test
+    fun computePlateBounds_whenTextExceedsOriginalBox_expandsSymmetrically() {
+        val bounds =
+            TextInpainter.computePlateBounds(
+                box = TextInpainter.BoxCoordinates(100f, 200f, 200f, 250f),
+                textSize = Pair(150f, 80f),
+                padding = Pair(10f, 10f),
+            )
+
+        // Original center: X = 150f, Y = 225f
+        assertEquals(150f, bounds.centerX, 0.01f)
+        assertEquals(225f, bounds.centerY, 0.01f)
+
+        // Must expand beyond original box
+        assertTrue(bounds.left < 100f)
+        assertTrue(bounds.right > 200f)
+        assertTrue(bounds.top < 200f)
+        assertTrue(bounds.bottom > 250f)
+
+        // Must accommodate text + padding (150 + 20 = 170, 80 + 20 = 100)
+        assertEquals(170f, bounds.width, 0.01f)
+        assertEquals(100f, bounds.height, 0.01f)
+    }
+
+    @Test
+    fun computePlateBounds_nearScreenBoundaries_clampsToScreen() {
+        val bounds =
+            TextInpainter.computePlateBounds(
+                box = TextInpainter.BoxCoordinates(5f, 5f, 50f, 50f),
+                textSize = Pair(80f, 80f),
+                padding = Pair(10f, 10f),
+                screenSize = Pair(1080f, 1920f),
+            )
+
+        assertTrue(bounds.left >= 0f)
+        assertTrue(bounds.top >= 0f)
+    }
+
+    @Test
+    fun calculateCollisionFreeExpansion_withAdjacentNeighbor_restrictsExpansion() {
+        val targetBox = TextInpainter.BoxCoordinates(100f, 100f, 200f, 140f)
+        val neighborRight = TextInpainter.BoxCoordinates(220f, 100f, 320f, 140f) // 20px gap
+
+        val constraints =
+            TextInpainter.calculateCollisionFreeExpansion(
+                targetBox = targetBox,
+                otherBoxes = listOf(neighborRight),
+                safetyMargin = 2f,
+            )
+
+        // Gap = 20px, safeHalf = 10px, - 2px safetyMargin = 8px
+        assertEquals(8f, constraints.maxExpandRight, 0.01f)
+        assertEquals(Float.MAX_VALUE, constraints.maxExpandLeft, 0.01f)
+    }
+
+    @Test
+    fun computePlateBounds_withCollisionConstraint_doesNotExceedConstraint() {
+        val targetBox = TextInpainter.BoxCoordinates(100f, 100f, 200f, 140f)
+        val constraints = TextInpainter.ExpansionConstraints(maxExpandRight = 8f)
+
+        val bounds =
+            TextInpainter.computePlateBounds(
+                box = targetBox,
+                textSize = Pair(250f, 40f), // Wants 250px + 20px = 270px width (expand 35px each side)
+                padding = Pair(10f, 10f),
+                constraints = constraints,
+            )
+
+        // Right bound must not expand beyond targetBox.right + 8f (208f)
+        assertTrue(bounds.right <= 208.01f)
+    }
 }

@@ -4,4 +4,59 @@
     <string name="notification_channel_desc">Active screen capture and translation overlay</string>
     <string name="notification_title">CreamTranslator is active</string>
     <string name="notification_text">Tap the floating widget to translate screen</string>
+
+    <!-- Dashboard Strings -->
+    <string name="tagline">Zero-Cost On-Device Screen Translator for Games</string>
+    <string name="status_title">System Status</string>
+    <string name="status_app_version">• App Version: v%1$s (Build %2$d)</string>
+    <string name="status_overlay_permission">• Overlay Permission: %1$s</string>
+    <string name="status_permission_granted">Granted</string>
+    <string name="status_permission_missing">Missing</string>
+    <string name="status_offline_model">• Offline Model (%1$s): %2$s</string>
+    <string name="status_model_ready">Ready (Offline)</string>
+    <string name="status_model_downloading">Downloading…</string>
+    <string name="status_model_not_ready">Not Ready</string>
+    <string name="status_anti_cheat">• Anti-Cheat Safe: Verified (Zero Accessibility)</string>
+
+    <!-- Buttons & Actions -->
+    <string name="btn_grant_overlay_permission">Grant Overlay Permission</string>
+    <string name="btn_start_service">Start Translator Service</string>
+    <string name="btn_reverify_model">Re-verify Offline Model</string>
+    <string name="btn_check_update">Check for Updates</string>
+    <string name="btn_checking_update">Checking for updates…</string>
+
+    <!-- Messages & Toasts -->
+    <string name="msg_screen_translator_started">Screen Translator Started</string>
+    <string name="msg_screen_capture_denied">Screen capture permission denied</string>
+    <string name="msg_grant_install_unknown_sources">Please grant Install Unknown Apps permission</string>
+
+    <!-- Update Dialog -->
+    <string name="update_dialog_title">New Update: %1$s</string>
+    <string name="update_dialog_size">Size: %1$d MB</string>
+    <string name="update_dialog_release_notes">Release Notes:</string>
+    <string name="update_dialog_no_notes">No release notes provided.</string>
+    <string name="update_dialog_btn_download">Download &amp; Install</string>
+    <string name="update_dialog_btn_later">Later</string>
+    <string name="update_dialog_downloading_title">Downloading update…</string>
+    <string name="update_dialog_progress">Progress: %1$d%%</string>
+    <string name="update_dialog_ready_title">Download Completed</string>
+    <string name="update_dialog_ready_message">Installer package is ready. Tap continue to install update.</string>
+    <string name="update_dialog_btn_install">Install Now</string>
+    <string name="update_dialog_btn_close">Close</string>
+    <string name="update_dialog_latest_title">Update Status</string>
+    <string name="update_dialog_latest_message">You are using the latest version (v%1$s).</string>
+    <string name="update_dialog_btn_got_it">Got it</string>
+    <string name="update_dialog_error_title">Update Error</string>
+    <string name="update_check_failed">Update check failed</string>
+
+    <!-- Overlay Service Messages -->
+    <string name="overlay_trigger_enabled">CreamTranslator: Floating translation trigger enabled (CT)</string>
+    <string name="overlay_processing_wait">Processing, please wait…</string>
+    <string name="overlay_capture_not_ready">Screen capture service not ready</string>
+    <string name="overlay_capture_failed">Unable to capture screen (or screen is DRM protected)</string>
+    <string name="overlay_ocr_recognizing">Recognizing text on screen…</string>
+    <string name="overlay_ocr_no_text">No text detected on screen</string>
+    <string name="overlay_translating_blocks">Translating %1$d text blocks…</string>
+    <string name="overlay_tap_hint">Tap text to toggle original/translation. Tap empty area to dismiss.</string>
+    <string name="overlay_error_prefix">Processing error: %1$s</string>
 </resources>

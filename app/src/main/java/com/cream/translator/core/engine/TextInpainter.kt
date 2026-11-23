@@ -3,6 +3,9 @@ package com.cream.translator.core.engine
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import com.cream.translator.ui.overlay.OverlayConfig
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 object TextInpainter {
@@ -93,7 +96,7 @@ object TextInpainter {
     }
 
     /**
-     * Calculates optimal dynamic font size (in SP / pixels) to fit inside the bounding box.
+     * Calculates optimal dynamic font size (in SP) to fit inside the bounding box.
      */
     fun calculateOptimalFontSize(
         boxWidth: Int,
@@ -101,14 +104,151 @@ object TextInpainter {
         textLength: Int,
         density: Float = 2.0f,
     ): Float {
-        if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0 || density <= 0f) return 14f
+        if (textLength <= 0 || boxWidth <= 0 || boxHeight <= 0 || density <= 0f) {
+            return OverlayConfig.DEFAULT_FONT_SIZE_SP
+        }
 
+        val safeDensity = if (density <= 0f) 1.0f else density
+        val boxHeightDp = boxHeight / safeDensity
         val area = boxWidth.toFloat() * boxHeight.toFloat()
-        // Approximate character cell dimension
-        val targetCharArea = area / (textLength * 1.2f)
-        val calculatedSize = sqrt(targetCharArea) / density
 
-        // Clamp font size between 10sp and 28sp for readability in mobile games
-        return calculatedSize.coerceIn(10f, 28f)
+        // Approximate character cell dimension
+        val targetCharArea = area / (textLength * 1.15f)
+        val sizeFromArea = sqrt(targetCharArea) / safeDensity
+
+        // For single-line or small height boxes, prevent font height from exceeding box height
+        val estimatedLines = max(1, (textLength * sizeFromArea * safeDensity * 0.55f / boxWidth).toInt())
+        val maxFontPerLine = (boxHeightDp / estimatedLines) * 0.85f
+
+        val bestSize = min(sizeFromArea, maxFontPerLine)
+        return bestSize.coerceIn(OverlayConfig.MIN_FONT_SIZE_SP, OverlayConfig.MAX_FONT_SIZE_SP)
+    }
+
+    data class BoxCoordinates(
+        val left: Float,
+        val top: Float,
+        val right: Float,
+        val bottom: Float,
+    ) {
+        val width: Float get() = max(0f, right - left)
+        val height: Float get() = max(0f, bottom - top)
+        val centerX: Float get() = left + width / 2f
+        val centerY: Float get() = top + height / 2f
+    }
+
+    data class ExpansionConstraints(
+        val maxExpandLeft: Float = Float.MAX_VALUE,
+        val maxExpandRight: Float = Float.MAX_VALUE,
+        val maxExpandTop: Float = Float.MAX_VALUE,
+        val maxExpandBottom: Float = Float.MAX_VALUE,
+    )
+
+    /**
+     * Calculates the maximum safe expansion distances in all four directions
+     * to prevent colliding with neighboring bounding boxes.
+     */
+    fun calculateCollisionFreeExpansion(
+        targetBox: BoxCoordinates,
+        otherBoxes: List<BoxCoordinates>,
+        safetyMargin: Float = 4f,
+    ): ExpansionConstraints {
+        var maxExpandLeft = Float.MAX_VALUE
+        var maxExpandRight = Float.MAX_VALUE
+        var maxExpandTop = Float.MAX_VALUE
+        var maxExpandBottom = Float.MAX_VALUE
+
+        for (other in otherBoxes) {
+            // Check vertical overlap for horizontal neighbors
+            val hasVerticalOverlap =
+                max(targetBox.top, other.top) < min(targetBox.bottom, other.bottom) + 8f
+            if (hasVerticalOverlap) {
+                if (other.left >= targetBox.right) {
+                    val gap = max(0f, other.left - targetBox.right)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandRight = min(maxExpandRight, safeHalf)
+                } else if (other.right <= targetBox.left) {
+                    val gap = max(0f, targetBox.left - other.right)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandLeft = min(maxExpandLeft, safeHalf)
+                }
+            }
+
+            // Check horizontal overlap for vertical neighbors
+            val hasHorizontalOverlap =
+                max(targetBox.left, other.left) < min(targetBox.right, other.right) + 8f
+            if (hasHorizontalOverlap) {
+                if (other.top >= targetBox.bottom) {
+                    val gap = max(0f, other.top - targetBox.bottom)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandBottom = min(maxExpandBottom, safeHalf)
+                } else if (other.bottom <= targetBox.top) {
+                    val gap = max(0f, targetBox.top - other.bottom)
+                    val safeHalf = max(0f, gap / 2f - safetyMargin)
+                    maxExpandTop = min(maxExpandTop, safeHalf)
+                }
+            }
+        }
+
+        return ExpansionConstraints(maxExpandLeft, maxExpandRight, maxExpandTop, maxExpandBottom)
+    }
+
+    /**
+     * Calculates adaptive plate bounds that symmetrically expand if rendered text
+     * exceeds the original bounding box, keeping text centered and within screen boundaries.
+     */
+    fun computePlateBounds(
+        box: BoxCoordinates,
+        textSize: Pair<Float, Float>,
+        padding: Pair<Float, Float>,
+        screenSize: Pair<Float, Float> = Pair(Float.MAX_VALUE, Float.MAX_VALUE),
+        constraints: ExpansionConstraints = ExpansionConstraints(),
+    ): BoxCoordinates {
+        val textWidth = textSize.first
+        val textHeight = textSize.second
+        val horizontalPadding = padding.first
+        val verticalPadding = padding.second
+
+        val requiredWidth = textWidth + horizontalPadding * 2f
+        val requiredHeight = textHeight + verticalPadding * 2f
+
+        val desiredExpandX = max(0f, (requiredWidth - box.width) / 2f)
+        val desiredExpandY = max(0f, (requiredHeight - box.height) / 2f)
+
+        val expandLeft = min(desiredExpandX, constraints.maxExpandLeft)
+        val expandRight = min(desiredExpandX, constraints.maxExpandRight)
+        val expandTop = min(desiredExpandY, constraints.maxExpandTop)
+        val expandBottom = min(desiredExpandY, constraints.maxExpandBottom)
+
+        var left = box.left - expandLeft
+        var right = box.right + expandRight
+        var top = box.top - expandTop
+        var bottom = box.bottom + expandBottom
+
+        val screenWidth = screenSize.first
+        val screenHeight = screenSize.second
+
+        // Clamp to screen boundaries if boundaries are specified
+        if (left < 0f) {
+            val shift = -left
+            left = 0f
+            right = min(screenWidth, right + shift)
+        }
+        if (right > screenWidth) {
+            val shift = right - screenWidth
+            right = screenWidth
+            left = max(0f, left - shift)
+        }
+        if (top < 0f) {
+            val shift = -top
+            top = 0f
+            bottom = min(screenHeight, bottom + shift)
+        }
+        if (bottom > screenHeight) {
+            val shift = bottom - screenHeight
+            bottom = screenHeight
+            top = max(0f, top - shift)
+        }
+
+        return BoxCoordinates(left, top, right, bottom)
     }
 }

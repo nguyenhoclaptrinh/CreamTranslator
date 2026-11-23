@@ -27,6 +27,9 @@ val (major, minor, patch) =
 val appVersionCode = (major * 10000) + (minor * 1000) + patch
 val appVersionName = "$major.$minor.$patch"
 
+val repoOwner = providers.gradleProperty("githubRepoOwner").getOrElse("nguyenhoclaptrinh")
+val repoName = providers.gradleProperty("githubRepoName").getOrElse("CreamTranslator")
+
 android {
     namespace = "com.cream.translator"
     compileSdk = 34
@@ -37,6 +40,9 @@ android {
         targetSdk = 34
         versionCode = appVersionCode
         versionName = appVersionName
+
+        buildConfigField("String", "GITHUB_REPO_OWNER", "\"$repoOwner\"")
+        buildConfigField("String", "GITHUB_REPO_NAME", "\"$repoName\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

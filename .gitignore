@@ -43,3 +43,15 @@ captures/
 # OS Specific
 .DS_Store
 Thumbs.db
+
+# Test artifacts, UIAutomator dumps, and debug screen captures
+*_dump.xml
+*dump*.xml
+screen_*.png
+install_prompt.xml
+proj_dialog.xml
+usb_dump.xml
+dist/
+build_artifacts/
+.worktrees/
+

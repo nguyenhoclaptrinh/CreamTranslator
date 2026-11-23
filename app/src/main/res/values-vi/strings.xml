@@ -1,0 +1,62 @@
+<resources>
+    <string name="app_name">CreamTranslator</string>
+    <string name="notification_channel_name">Dịch vụ dịch màn hình</string>
+    <string name="notification_channel_desc">Đang chạy chụp khung hình và hiển thị lớp phủ dịch</string>
+    <string name="notification_title">CreamTranslator đang hoạt động</string>
+    <string name="notification_text">Chạm vào nút nổi để dịch màn hình</string>
+
+    <!-- Dashboard Strings -->
+    <string name="tagline">Trình dịch màn hình game on-device miễn phí trọn đời</string>
+    <string name="status_title">Trạng thái hệ thống</string>
+    <string name="status_app_version">• Phiên bản: v%1$s (Build %2$d)</string>
+    <string name="status_overlay_permission">• Quyền hiển thị trên ứng dụng khác: %1$s</string>
+    <string name="status_permission_granted">Đã cấp</string>
+    <string name="status_permission_missing">Chưa cấp</string>
+    <string name="status_offline_model">• Gói dịch Offline (%1$s): %2$s</string>
+    <string name="status_model_ready">Sẵn sàng (Offline)</string>
+    <string name="status_model_downloading">Đang tải xuống…</string>
+    <string name="status_model_not_ready">Chưa sẵn sàng</string>
+    <string name="status_anti_cheat">• An toàn chống cấm (Anti-Cheat): Đã xác thực (Zero Accessibility)</string>
+
+    <!-- Buttons & Actions -->
+    <string name="btn_grant_overlay_permission">Cấp quyền hiển thị trên ứng dụng khác</string>
+    <string name="btn_start_service">Khởi chạy dịch vụ dịch</string>
+    <string name="btn_reverify_model">Kiểm tra lại gói dịch Offline</string>
+    <string name="btn_check_update">Kiểm tra bản cập nhật</string>
+    <string name="btn_checking_update">Đang kiểm tra cập nhật…</string>
+
+    <!-- Messages & Toasts -->
+    <string name="msg_screen_translator_started">Đã khởi chạy trình dịch màn hình</string>
+    <string name="msg_screen_capture_denied">Quyền chụp màn hình bị từ chối</string>
+    <string name="msg_grant_install_unknown_sources">Vui lòng cấp quyền Cài đặt ứng dụng không rõ nguồn</string>
+
+    <!-- Update Dialog -->
+    <string name="update_dialog_title">Bản cập nhật mới: %1$s</string>
+    <string name="update_dialog_size">Dung lượng: %1$d MB</string>
+    <string name="update_dialog_release_notes">Ghi chú phát hành:</string>
+    <string name="update_dialog_no_notes">Không có ghi chú phát hành.</string>
+    <string name="update_dialog_btn_download">Tải và cài đặt</string>
+    <string name="update_dialog_btn_later">Để sau</string>
+    <string name="update_dialog_downloading_title">Đang tải bản cập nhật…</string>
+    <string name="update_dialog_progress">Tiến độ: %1$d%%</string>
+    <string name="update_dialog_ready_title">Tải hoàn tất</string>
+    <string name="update_dialog_ready_message">Tệp cài đặt đã sẵn sàng. Chạm tiếp tục để cài đặt cập nhật.</string>
+    <string name="update_dialog_btn_install">Cài đặt ngay</string>
+    <string name="update_dialog_btn_close">Đóng</string>
+    <string name="update_dialog_latest_title">Thông báo cập nhật</string>
+    <string name="update_dialog_latest_message">Bạn đang sử dụng phiên bản mới nhất (v%1$s).</string>
+    <string name="update_dialog_btn_got_it">Đã hiểu</string>
+    <string name="update_dialog_error_title">Lỗi cập nhật</string>
+    <string name="update_check_failed">Kiểm tra cập nhật thất bại</string>
+
+    <!-- Overlay Service Messages -->
+    <string name="overlay_trigger_enabled">CreamTranslator: Đã kích hoạt nút dịch nổi (CT)</string>
+    <string name="overlay_processing_wait">Đang xử lý, vui lòng chờ…</string>
+    <string name="overlay_capture_not_ready">Dịch vụ chụp màn hình chưa sẵn sàng</string>
+    <string name="overlay_capture_failed">Không thể chụp màn hình (hoặc màn hình được bảo mật)</string>
+    <string name="overlay_ocr_recognizing">Đang nhận diện văn bản…</string>
+    <string name="overlay_ocr_no_text">Không tìm thấy chữ trên màn hình</string>
+    <string name="overlay_translating_blocks">Đang dịch %1$d khối chữ…</string>
+    <string name="overlay_tap_hint">Chạm vào chữ để đổi bản gốc/dịch. Chạm ra ngoài để đóng.</string>
+    <string name="overlay_error_prefix">Lỗi xử lý: %1$s</string>
+</resources>
