@@ -34,10 +34,23 @@ Tài liệu này là chỉ dẫn hệ thống bắt buộc dành cho mọi AI co
    - **Tuyệt đối không push trực tiếp lên `main`**.
    - Mọi thay đổi đều phải được thực hiện trên feature/fix branch và đưa vào qua Pull Request (PR) nhắm vào `main`.
    - Mỗi commit phải tuân thủ chuẩn **Conventional Commits** (`feat:`, `fix:`, `perf:`, `docs:`, `refactor:`, `test:`, `ci:`).
-   - Chỉ squash-merge PR vào `main` khi **toàn bộ các required status checks** (`Code Quality & Unit Tests` và `Build Assemble Debug APK`) đều hiển thị trạng thái xanh (SUCCESS).
+   - **Bất biến về quyền Merge PR**:
+     - Agent **CHỈ ĐƯỢC PHÉP** tạo PR, giám sát CI hoàn tất và báo cáo link PR kèm tóm tắt kỹ thuật cho người dùng.
+     - **DỪNG LẠI TẠI ĐÂY** để người dùng trực tiếp review và đưa ra quyết định.
+     - **TUYỆT ĐỐI KHÔNG TỰ Ý MERGE PR** trừ khi nhận được mệnh lệnh rõ ràng, tường minh từ người dùng (ví dụ: *"hãy merge PR"* hoặc *"CI xanh thì merge luôn"*).
 4. **An toàn, phòng vệ và không phá hủy (Non-Destructive Operations)**:
    - Không chạy các lệnh xóa file, force-push hay xóa nhánh khi chưa xác định rõ rủi ro và tác động phụ.
    - Không che giấu lỗi bằng cách chèn `@Suppress`, bỏ qua exception im lặng hoặc tắt các bộ kiểm tra chất lượng mà không có lý do kỹ thuật chính đáng.
+5. **Tiêu chuẩn đề xuất giải pháp & Chống nợ kỹ thuật (Anti-Technical Debt & Deep Evaluation)**:
+   - **Tuyệt đối không đề xuất giải pháp vá víu, hời hợt**: Không chọn phương án chỉ để "chữa cháy tạm thời", tiết kiệm vài giây mà để lại nợ kỹ thuật, code rác hoặc phá vỡ tính nhất quán của kiến trúc.
+   - **Bắt buộc đánh giá và so sánh đa chiều**: Khi đưa ra các giải pháp giải quyết vấn đề, không được chỉ liệt kê các gạch đầu dòng bề mặt. Bắt buộc phải phân tích và so sánh rõ:
+     - Ưu điểm (Pros) & Nhược điểm (Cons).
+     - Tác động dài hạn tới kiến trúc, hiệu năng và tính bảo trì (Maintenance overhead).
+     - Rủi ro phát sinh lỗi phụ (Side-effects & Regressions).
+     - Nêu rõ khuyến nghị kỹ thuật có luận cứ vững chắc nhất thay vì phó mặc cho người dùng tự mò mẫm.
+6. **Tiêu chuẩn giao tiếp kỹ thuật & Tránh hỏi vội vã (High-Leverage Inquiries)**:
+   - Tuyệt đối không đưa ra các câu hỏi/đề xuất nhanh nhảu, hấp tấp kiểu "có muốn fix ngay lỗi này theo cách A không" khi chưa đánh giá toàn diện.
+   - Khi cần tham vấn người dùng, câu hỏi phải ở mức tối ưu, tập trung vào quyết định thiết kế kiến trúc then chốt hoặc ranh giới nghiệp vụ, đi kèm đầy đủ bối cảnh đánh đổi (trade-offs).
 
 ---
 
@@ -153,6 +166,6 @@ gh pr create --title "<type>(<pham-vi>): <tieu-de>" --body "<Mo-ta-chi-tiet-thay
 # 6. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
 gh pr checks <pr-number> --watch
 
-# 7. Squash merge vào main và dọn dẹp nhánh
-gh pr merge <pr-number> --squash --delete-branch
+# 7. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
+# TUYỆT ĐỐI KHÔNG tự chạy 'gh pr merge' trừ khi có lệnh tường minh từ người dùng!
 ```
