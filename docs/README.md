@@ -32,6 +32,7 @@ Các bản ADR ghi nhận các quyết định công nghệ và ranh giới bấ
 | **[ADR-001](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-001-on-device-mlkit-pipeline.md)** | Selection of On-Device ML Kit Over Cloud Translation APIs | `Accepted` | Sử dụng Google ML Kit On-Device (Text Recognition v2 & Translation) thay thế Cloud APIs để triệt tiêu chi phí định kỳ và bảo mật dữ liệu tuyệt đối. |
 | **[ADR-002](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-002-zero-accessibility-architecture.md)** | Zero-Accessibility Architecture for Anti-Cheat Compliance | `Accepted` | Sử dụng MediaProjection và In-Place Translation Overlay độc lập; tuyệt đối không sử dụng AccessibilityService để tránh bị hệ thống Anti-Cheat của game cấm tài khoản. |
 | **[ADR-003](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-003-inplace-inpainting-and-overlay.md)** | In-Place Inpainting and Overlay Rendering Architecture | `Accepted` | Render chữ đè trực tiếp lên màn hình tại đúng toạ độ bounding box với mẫu màu nền tương phản tự động (TextInpainter) và StaticLayout. |
+| **[ADR-004](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-004-ai-agent-optimized-architecture.md)** | AI-Agent-Optimized Layered Architecture and Testing Harness | `Accepted` | Tái cấu trúc Layered Interface-First cho OverlayService, tích hợp Robolectric trên JVM và module hóa tài liệu hướng dẫn Agent. |
 
 ---
 
