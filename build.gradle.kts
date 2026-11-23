@@ -17,7 +17,9 @@ subprojects {
     }
 
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
-        ratchetFrom("origin/main")
+        if (rootProject.file(".git").isDirectory) {
+            ratchetFrom("origin/main")
+        }
         kotlin {
             target("**/*.kt")
             targetExclude("**/build/**")

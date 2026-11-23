@@ -15,11 +15,17 @@ import kotlin.coroutines.resumeWithException
 class MlKitOcrEngine : OcrEngine {
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-    override suspend fun recognizeText(bitmap: Bitmap): List<TextRegion> =
-        suspendCancellableCoroutine { continuation ->
+    override suspend fun recognizeText(bitmap: Bitmap): List<TextRegion> {
+        if (bitmap.isRecycled) {
+            Timber.w("Cannot recognize text on recycled bitmap")
+            return emptyList()
+        }
+
+        return suspendCancellableCoroutine { continuation ->
             val image = InputImage.fromBitmap(bitmap, 0)
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
+                    if (!continuation.isActive) return@addOnSuccessListener
                     val regions = mutableListOf<TextRegion>()
 
                     // Iterate over text blocks and lines
@@ -42,10 +48,12 @@ class MlKitOcrEngine : OcrEngine {
                     continuation.resume(regions)
                 }
                 .addOnFailureListener { exception ->
+                    if (!continuation.isActive) return@addOnFailureListener
                     Timber.e(exception, "OCR processing failed")
                     continuation.resumeWithException(exception)
                 }
         }
+    }
 
     override fun close() {
         try {

@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.WindowManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -29,10 +30,15 @@ class ScreenCaptureManager(
     private var screenWidth: Int = 1080
     private var screenHeight: Int = 1920
 
+    @Volatile
+    var isProjectionActive: Boolean = true
+        private set
+
     private val projectionCallback =
         object : MediaProjection.Callback() {
             override fun onStop() {
                 super.onStop()
+                isProjectionActive = false
                 release()
             }
         }
@@ -85,6 +91,7 @@ class ScreenCaptureManager(
         withContext(Dispatchers.Default) {
             val reader = imageReader ?: return@withContext null
             var image: Image? = null
+            var rawBitmap: Bitmap? = null
             try {
                 image = reader.acquireLatestImage()
                 if (image == null) {
@@ -103,23 +110,30 @@ class ScreenCaptureManager(
                 val rowStride = planes[0].rowStride
                 val rowPadding = rowStride - pixelStride * screenWidth
 
-                val bitmap =
+                rawBitmap =
                     Bitmap.createBitmap(
                         screenWidth + rowPadding / pixelStride,
                         screenHeight,
                         Bitmap.Config.ARGB_8888,
                     )
-                bitmap.copyPixelsFromBuffer(buffer)
+                rawBitmap.copyPixelsFromBuffer(buffer)
 
                 // Crop out padding if present
                 if (rowPadding == 0) {
-                    bitmap
+                    val result = rawBitmap
+                    rawBitmap = null
+                    result
                 } else {
-                    val cleanBitmap = Bitmap.createBitmap(bitmap, 0, 0, screenWidth, screenHeight)
-                    bitmap.recycle()
+                    val cleanBitmap = Bitmap.createBitmap(rawBitmap, 0, 0, screenWidth, screenHeight)
+                    rawBitmap.recycle()
+                    rawBitmap = null
                     cleanBitmap
                 }
-            } catch (e: Exception) {
+            } catch (cancellation: CancellationException) {
+                rawBitmap?.recycle()
+                throw cancellation
+            } catch (e: Throwable) {
+                rawBitmap?.recycle()
                 Timber.e(e, "Error capturing screen frame")
                 null
             } finally {

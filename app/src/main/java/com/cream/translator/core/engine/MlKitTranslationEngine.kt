@@ -6,6 +6,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -84,7 +85,9 @@ class MlKitTranslationEngine : TranslationEngine {
                 async {
                     try {
                         translate(text, languagePair)
-                    } catch (e: Exception) {
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (e: Throwable) {
                         Timber.w(e, "Fallback to original text due to translation error")
                         text
                     }

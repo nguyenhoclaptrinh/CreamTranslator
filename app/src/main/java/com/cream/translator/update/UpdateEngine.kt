@@ -1,7 +1,9 @@
 package com.cream.translator.update
 
+import com.cream.translator.core.model.error.CreamError
 import com.cream.translator.update.model.AppReleaseInfo
 import com.cream.translator.update.model.DownloadState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -12,8 +14,11 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 
 class UpdateEngine(
     private val repoOwner: String = "nguyenhoclaptrinh",
@@ -34,6 +39,13 @@ class UpdateEngine(
 
                 val responseCode = connection.responseCode
                 if (responseCode != HttpURLConnection.HTTP_OK) {
+                    if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+                        val resetHeader = connection.getHeaderField("X-RateLimit-Reset")
+                        val resetSeconds = resetHeader?.toLongOrNull()
+                        val err = CreamError.UpdateError.RateLimited(resetSeconds)
+                        Timber.w("GitHub API rate limit exceeded. Reset at: %s", resetSeconds)
+                        return@withContext Result.failure(IllegalStateException(err.userFriendlyMessage))
+                    }
                     val errorMsg = "GitHub API returned HTTP $responseCode"
                     Timber.e(errorMsg)
                     return@withContext Result.failure(IllegalStateException(errorMsg))
@@ -61,7 +73,7 @@ class UpdateEngine(
                 }
 
                 if (apkDownloadUrl == null) {
-                    Timber.w("No APK asset found in release $tagName")
+                    Timber.w("No APK asset found in release %s", tagName)
                     return@withContext Result.success(null)
                 }
 
@@ -78,7 +90,15 @@ class UpdateEngine(
                 } else {
                     Result.success(null)
                 }
-            } catch (e: Exception) {
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: UnknownHostException) {
+                Timber.e(e, "Network unavailable when checking for updates")
+                Result.failure(IllegalStateException(CreamError.UpdateError.NetworkUnavailable(e).userFriendlyMessage))
+            } catch (e: SocketTimeoutException) {
+                Timber.e(e, "Connection timeout when checking for updates")
+                Result.failure(IllegalStateException("Hết thời gian kết nối tới máy chủ cập nhật"))
+            } catch (e: Throwable) {
                 Timber.e(e, "Error checking for updates")
                 Result.failure(e)
             }
@@ -98,7 +118,11 @@ class UpdateEngine(
             try {
                 connection = resolveRedirectConnection(downloadUrl)
                 if (connection == null) {
-                    emit(DownloadState.Error("Không thể thiết lập kết nối tải an toàn (chuyển hướng thất bại)"))
+                    emit(
+                        DownloadState.Error(
+                            "Không thể thiết lập kết nối tải an toàn (chuyển hướng thất bại)",
+                        ),
+                    )
                     return@flow
                 }
 
@@ -116,11 +140,8 @@ class UpdateEngine(
                 if (totalBytes > 0 && tempFile.length() != totalBytes) {
                     val actualLength = tempFile.length()
                     tempFile.delete()
-                    emit(
-                        DownloadState.Error(
-                            "Tệp tải về không đầy đủ (nhận $actualLength/$totalBytes bytes)",
-                        ),
-                    )
+                    val err = CreamError.UpdateError.PayloadCorrupted(totalBytes, actualLength)
+                    emit(DownloadState.Error(err.userFriendlyMessage))
                     return@flow
                 }
 
@@ -135,7 +156,9 @@ class UpdateEngine(
                 }
 
                 emit(DownloadState.Completed(destinationFile))
-            } catch (e: Exception) {
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: Throwable) {
                 Timber.e(e, "Exception during APK download")
                 emit(DownloadState.Error(e.message ?: "Lỗi tải tệp cài đặt"))
             } finally {
@@ -159,27 +182,14 @@ class UpdateEngine(
                     instanceFollowRedirects = false
                 }
 
-            val code = conn.responseCode
-            val isRedirect =
-                code == HttpURLConnection.HTTP_MOVED_PERM ||
-                    code == HttpURLConnection.HTTP_MOVED_TEMP ||
-                    code == HTTP_SEE_OTHER ||
-                    code == HTTP_TEMP_REDIRECT ||
-                    code == HTTP_PERM_REDIRECT
-
-            if (isRedirect) {
-                val location = conn.getHeaderField("Location")
-                // Enforce HTTPS security: block insecure cleartext downgrade attacks
-                if (location != null && location.startsWith("https://", ignoreCase = true)) {
-                    currentUrl = location
-                    conn.disconnect()
-                    redirects++
-                } else {
-                    Timber.w("Blocked non-HTTPS or missing redirect location: $location")
-                    conn.disconnect()
-                    return null
-                }
-            } else if (code == HttpURLConnection.HTTP_OK) {
+            val status = conn.responseCode
+            if (status in REDIRECT_STATUS_CODES) {
+                val newUrl = conn.getHeaderField("Location")
+                conn.disconnect()
+                if (newUrl == null) return null
+                currentUrl = newUrl
+                redirects++
+            } else if (status == HttpURLConnection.HTTP_OK) {
                 return conn
             } else {
                 conn.disconnect()
@@ -189,61 +199,65 @@ class UpdateEngine(
         return null
     }
 
-    private suspend fun writeStreamWithProgress(
+    private inline fun writeStreamWithProgress(
         input: InputStream,
-        output: FileOutputStream,
+        output: OutputStream,
         totalBytes: Long,
-        onProgress: suspend (Long, Int) -> Unit,
+        onProgress: (downloaded: Long, percent: Int) -> Unit,
     ) {
         val buffer = ByteArray(BUFFER_SIZE)
         var bytesRead: Int
-        var bytesDownloaded = 0L
-        var lastReportedPercent = -1
+        var totalRead = 0L
 
         while (input.read(buffer).also { bytesRead = it } != -1) {
             output.write(buffer, 0, bytesRead)
-            bytesDownloaded += bytesRead
+            totalRead += bytesRead
             val percent =
                 if (totalBytes > 0) {
-                    ((bytesDownloaded * 100) / totalBytes).toInt()
+                    ((totalRead * 100) / totalBytes).toInt().coerceIn(0, 100)
                 } else {
                     0
                 }
-
-            if (percent != lastReportedPercent) {
-                lastReportedPercent = percent
-                onProgress(bytesDownloaded, percent)
-            }
+            onProgress(totalRead, percent)
         }
+        output.flush()
     }
 
-    fun isNewerVersion(
+    internal fun isNewerVersion(
         remoteVersion: String,
         currentVersion: String,
     ): Boolean {
-        // Strip pre-release and build metadata (e.g., "1.0.1-beta.1+build20" -> "1.0.1")
-        val cleanRemote = remoteVersion.substringBefore("-").substringBefore("+")
-        val cleanCurrent = currentVersion.substringBefore("-").substringBefore("+")
+        val remoteClean = remoteVersion.substringBefore("-").substringBefore("+")
+        val currentClean = currentVersion.substringBefore("-").substringBefore("+")
 
-        val remoteParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
+        val remoteParts = remoteClean.split(".").mapNotNull { it.toIntOrNull() }
+        val currentParts = currentClean.split(".").mapNotNull { it.toIntOrNull() }
 
-        val maxLen = maxOf(remoteParts.size, currentParts.size)
-        for (i in 0 until maxLen) {
+        val maxLength = maxOf(remoteParts.size, currentParts.size)
+        for (i in 0 until maxLength) {
             val r = remoteParts.getOrElse(i) { 0 }
             val c = currentParts.getOrElse(i) { 0 }
             if (r > c) return true
             if (r < c) return false
         }
+
         return false
     }
 
     companion object {
-        private const val TIMEOUT_MS = 15000
-        private const val BUFFER_SIZE = 8192
+        private const val TIMEOUT_MS = 15_000
+        private const val BUFFER_SIZE = 8 * 1024
         private const val MAX_REDIRECTS = 5
-        private const val HTTP_SEE_OTHER = 303
-        private const val HTTP_TEMP_REDIRECT = 307
-        private const val HTTP_PERM_REDIRECT = 308
+        private const val HTTP_TEMPORARY_REDIRECT = 307
+        private const val HTTP_PERMANENT_REDIRECT = 308
+
+        private val REDIRECT_STATUS_CODES =
+            setOf(
+                HttpURLConnection.HTTP_MOVED_TEMP,
+                HttpURLConnection.HTTP_MOVED_PERM,
+                HttpURLConnection.HTTP_SEE_OTHER,
+                HTTP_TEMPORARY_REDIRECT,
+                HTTP_PERMANENT_REDIRECT,
+            )
     }
 }
