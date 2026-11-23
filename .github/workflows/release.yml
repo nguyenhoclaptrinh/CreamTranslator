@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   release:
@@ -22,6 +23,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
