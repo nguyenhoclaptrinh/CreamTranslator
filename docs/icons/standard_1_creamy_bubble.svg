@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background: Clean Anime Warm Sakura Gradient -->
+    <linearGradient id="std1_bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF1F2" />
+      <stop offset="100%" stop-color="#FFE4E6" />
+    </linearGradient>
+
+    <!-- Cream Speech Bubble Gradient -->
+    <linearGradient id="std1_bubble" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#FFFBEB" />
+    </linearGradient>
+
+    <!-- Vibrant Strawberry Accent Gradient -->
+    <linearGradient id="std1_strawberry" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+
+    <!-- Precision Ambient Shadow (Material 3 Key Elevation) -->
+    <filter id="std1_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#F43F5E" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Base 108dp App Container (Squircle) -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#std1_bg)" stroke="#FFFFFF" stroke-width="6" />
+
+  <!-- Safe Zone Circle Alignment (72% inner canvas) -->
+  <g filter="url(#std1_shadow)">
+    <!-- Primary Hero Shape: Creamy Speech Bubble with melting droplet notch -->
+    <path d="M 120 180 
+             C 120 135, 155 100, 200 100 
+             L 312 100 
+             C 357 100, 392 135, 392 180 
+             L 392 270 
+             C 392 315, 357 350, 312 350 
+             L 240 350 
+             L 170 395 
+             C 160 402, 148 395, 150 382 
+             L 154 350 
+             L 140 350 
+             C 129 350, 120 341, 120 330 
+             Z" 
+          fill="url(#std1_bubble)" />
+
+    <!-- Cute Cream Glaze Drip Accent on top-right edge -->
+    <path d="M 312 100 
+             C 330 100, 345 108, 355 120 
+             C 345 145, 360 160, 380 150 
+             C 390 160, 392 170, 392 180 
+             L 392 135 
+             C 392 115, 375 100, 355 100 Z" 
+          fill="url(#std1_strawberry)" />
+
+    <!-- Standard High-Legibility Translation Symbol inside (Bold & Scalable) -->
+    <!-- Left Character 'A' -->
+    <text x="206" y="252" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="82" font-weight="900" fill="#E11D48" text-anchor="middle">A</text>
+
+    <!-- Bold Transition Arrow (Rightward) -->
+    <path d="M 235 225 L 275 225 M 262 215 L 275 225 L 262 235" 
+          stroke="#0284C7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Right Character '文' / 'Á' -->
+    <text x="306" y="252" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="82" font-weight="900" fill="#0284C7" text-anchor="middle">Á</text>
+  </g>
+
+  <!-- Geometric Sparkle (Top Left) -->
+  <polygon points="90,110 94,120 104,124 94,128 90,138 86,128 76,124 86,120" fill="#FB7185" />
+</svg>
