@@ -14,8 +14,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.TextView
+import android.widget.ImageView
 import android.widget.Toast
+import com.cream.translator.R
 import com.cream.translator.core.engine.MlKitOcrEngine
 import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.engine.TextInpainter
@@ -99,22 +100,22 @@ class OverlayService : Service() {
                 y = 400
             }
 
-        // Stylish circular floating trigger button with "CT" brand text
+        // Stylish circular floating trigger button with brand vector icon
         val triggerButton =
-            TextView(this).apply {
-                text = "CT"
-                textSize = 18f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
+            ImageView(this).apply {
+                setImageResource(R.drawable.ic_notification_capture)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val pad = (11 * resources.displayMetrics.density).toInt()
+                setPadding(pad, pad, pad, pad)
 
                 val bg =
                     GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor("#EE0084FF"))
+                        setColor(Color.parseColor("#E11D48"))
                         setStroke((2 * resources.displayMetrics.density).toInt(), Color.WHITE)
                     }
                 background = bg
-                elevation = 12f
+                elevation = 14f
             }
 
         attachDragAndClickListener(triggerButton, triggerParams!!)
@@ -123,7 +124,7 @@ class OverlayService : Service() {
         if (attached) {
             floatingTriggerView = triggerButton
             Timber.d("Floating trigger attached successfully")
-            Toast.makeText(this, "CreamTranslator: Đã kích hoạt nút dịch nổi (CT)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "CreamTranslator: Đã kích hoạt nút dịch nổi", Toast.LENGTH_SHORT).show()
         } else {
             Timber.e("Failed to attach floating overlay view")
         }
