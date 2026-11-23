@@ -24,6 +24,7 @@
     <string name="btn_reverify_model">Re-verify Offline Model</string>
     <string name="btn_check_update">Check for Updates</string>
     <string name="btn_checking_update">Checking for updates…</string>
+    <string name="btn_filter_settings">Word Filter Settings</string>
 
     <!-- Messages & Toasts -->
     <string name="msg_screen_translator_started">Screen Translator Started</string>
@@ -59,4 +60,5 @@
     <string name="overlay_translating_blocks">Translating %1$d text blocks…</string>
     <string name="overlay_tap_hint">Tap text to toggle original/translation. Tap empty area to dismiss.</string>
     <string name="overlay_error_prefix">Processing error: %1$s</string>
+    <string name="overlay_no_new_content_filtered">No new content to translate (common words and symbols filtered)</string>
 </resources>
