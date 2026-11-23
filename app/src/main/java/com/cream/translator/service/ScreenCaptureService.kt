@@ -42,6 +42,13 @@ class ScreenCaptureService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
+        if (intent?.action == ACTION_STOP) {
+            Timber.i("ScreenCaptureService nhận lệnh ACTION_STOP")
+            TranslatorController.stop(this)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
         val resultData =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -56,7 +63,14 @@ class ScreenCaptureService : Service() {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
             mediaProjection?.let { projection ->
-                captureManager = ScreenCaptureManager(this, projection)
+                captureManager =
+                    ScreenCaptureManager(this, projection).apply {
+                        onStopCallback = {
+                            Timber.i("MediaProjection đã bị thu hồi/dừng từ hệ thống")
+                            TranslatorController.stop(this@ScreenCaptureService)
+                        }
+                    }
+                TranslatorController.updateServiceState(true)
                 Timber.d("MediaProjection initialized in ScreenCaptureService")
             }
         }
@@ -74,6 +88,18 @@ class ScreenCaptureService : Service() {
                 PendingIntent.FLAG_IMMUTABLE,
             )
 
+        val stopIntent =
+            Intent(this, ScreenCaptureService::class.java).apply {
+                action = ACTION_STOP
+            }
+        val stopPendingIntent =
+            PendingIntent.getService(
+                this,
+                1,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
         val notification: Notification =
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.notification_title))
@@ -81,6 +107,11 @@ class ScreenCaptureService : Service() {
                 .setSmallIcon(R.drawable.ic_notification_capture)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
+                .addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Dừng dịch",
+                    stopPendingIntent,
+                )
                 .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -109,9 +140,7 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    suspend fun captureCurrentScreen(): Bitmap? {
-        return captureManager?.captureFrame()
-    }
+    suspend fun captureCurrentScreen(): Bitmap? = captureManager?.captureFrame()
 
     override fun onDestroy() {
         instance = null
@@ -119,6 +148,7 @@ class ScreenCaptureService : Service() {
         captureManager = null
         mediaProjection?.stop()
         mediaProjection = null
+        TranslatorController.updateServiceState(false)
         super.onDestroy()
         Timber.d("ScreenCaptureService destroyed")
     }
@@ -126,6 +156,7 @@ class ScreenCaptureService : Service() {
     companion object {
         const val EXTRA_RESULT_CODE = "extra_result_code"
         const val EXTRA_RESULT_DATA = "extra_result_data"
+        const val ACTION_STOP = "com.cream.translator.action.STOP_CAPTURE"
         private const val CHANNEL_ID = "cream_screen_translator_channel"
         private const val NOTIFICATION_ID = 1001
 

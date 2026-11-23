@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,8 +49,7 @@ import androidx.lifecycle.lifecycleScope
 import com.cream.translator.BuildConfig
 import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.model.LanguagePair
-import com.cream.translator.service.OverlayService
-import com.cream.translator.service.ScreenCaptureService
+import com.cream.translator.service.TranslatorController
 import com.cream.translator.update.UpdateInstaller
 import com.cream.translator.update.UpdateUiState
 import com.cream.translator.update.UpdateViewModel
@@ -60,6 +60,7 @@ import java.io.File
 data class DashboardActions(
     val onRequestOverlayPermission: () -> Unit,
     val onStartService: () -> Unit,
+    val onStopService: () -> Unit,
     val onCheckUpdate: () -> Unit,
     val onStartDownload: (AppReleaseInfo) -> Unit,
     val onDismissUpdateDialog: () -> Unit,
@@ -89,14 +90,9 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
         ) { result ->
-            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                val serviceIntent =
-                    Intent(this, ScreenCaptureService::class.java).apply {
-                        putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, result.resultCode)
-                        putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, result.data)
-                    }
-                startForegroundService(serviceIntent)
-                startService(Intent(this, OverlayService::class.java))
+            val data = result.data
+            if (result.resultCode == Activity.RESULT_OK && data != null) {
+                TranslatorController.start(this, result.resultCode, data)
                 Toast.makeText(this, "Screen Translator Started", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Screen capture permission denied", Toast.LENGTH_SHORT).show()
@@ -113,10 +109,15 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val updateState by updateViewModel.uiState.collectAsState()
+                    val isServiceRunning by TranslatorController.isServiceRunning.collectAsState()
                     val actions =
                         DashboardActions(
                             onRequestOverlayPermission = { requestOverlayPermission() },
                             onStartService = { startScreenCapture() },
+                            onStopService = {
+                                TranslatorController.stop(this)
+                                Toast.makeText(this, "Screen Translator Stopped", Toast.LENGTH_SHORT).show()
+                            },
                             onCheckUpdate = { updateViewModel.checkForUpdate() },
                             onStartDownload = { release -> updateViewModel.startDownload(release) },
                             onDismissUpdateDialog = { updateViewModel.dismissDialog() },
@@ -131,6 +132,7 @@ class MainActivity : ComponentActivity() {
 
                     TranslatorDashboard(
                         hasOverlayPermission = hasOverlayPermission,
+                        isServiceRunning = isServiceRunning,
                         updateState = updateState,
                         actions = actions,
                     )
@@ -185,6 +187,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun TranslatorDashboard(
     hasOverlayPermission: Boolean,
+    isServiceRunning: Boolean,
     updateState: UpdateUiState,
     actions: DashboardActions,
 ) {
@@ -238,6 +241,16 @@ fun TranslatorDashboard(
                     }}",
                 )
                 Text(text = "• Anti-Cheat Safe: Verified (Zero Accessibility)")
+                val serviceStatus = if (isServiceRunning) "Running (Active)" else "Stopped (Inactive)"
+                Text(
+                    text = "• Translator Service: $serviceStatus",
+                    color =
+                        if (isServiceRunning) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
             }
         }
 
@@ -247,6 +260,14 @@ fun TranslatorDashboard(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Grant Overlay Permission")
+            }
+        } else if (isServiceRunning) {
+            Button(
+                onClick = actions.onStopService,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Stop Translator Service")
             }
         } else {
             Button(
@@ -354,14 +375,13 @@ private fun UpdateHandler(
         }
 
         is UpdateUiState.ReadyToInstall -> {
-            LaunchedEffect(updateState.apkFile) {
-                onInstall(updateState.apkFile)
-            }
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("Tải hoàn tất") },
+                title = { Text("Đã tải xong bản cập nhật") },
                 text = {
-                    Text("Tệp cài đặt đã sẵn sàng. Chạm tiếp tục để cài đặt cập nhật.")
+                    Text(
+                        "Bản cài đặt đã được tải và xác thực toàn vẹn. Nhấn 'Cài đặt ngay' để tiến hành nâng cấp.",
+                    )
                 },
                 confirmButton = {
                     Button(onClick = { onInstall(updateState.apkFile) }) {
@@ -376,23 +396,10 @@ private fun UpdateHandler(
             )
         }
 
-        is UpdateUiState.NoUpdateAvailable -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("Thông báo cập nhật") },
-                text = { Text("Bạn đang sử dụng phiên bản mới nhất (v${updateState.currentVersion}).") },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text("Đã hiểu")
-                    }
-                },
-            )
-        }
-
         is UpdateUiState.Error -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("Lỗi cập nhật") },
+                title = { Text("Cập nhật thất bại") },
                 text = { Text(updateState.message) },
                 confirmButton = {
                     TextButton(onClick = onDismiss) {
