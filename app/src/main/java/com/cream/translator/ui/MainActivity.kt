@@ -52,7 +52,9 @@ import com.cream.translator.BuildConfig
 import com.cream.translator.R
 import com.cream.translator.core.engine.MlKitTranslationEngine
 import com.cream.translator.core.model.LanguagePair
+import com.cream.translator.data.repository.FilterPreferencesRepository
 import com.cream.translator.service.TranslatorController
+import com.cream.translator.ui.settings.SettingsScreen
 import com.cream.translator.update.UpdateInstaller
 import com.cream.translator.update.UpdateUiState
 import com.cream.translator.update.UpdateViewModel
@@ -69,7 +71,13 @@ data class DashboardActions(
     val onDismissUpdateDialog: () -> Unit,
     val onInstallApk: (File) -> Unit,
     val onDownloadModel: (LanguagePair, (Boolean) -> Unit) -> Unit,
+    val onOpenSettings: () -> Unit,
 )
+
+enum class AppScreen {
+    DASHBOARD,
+    SETTINGS,
+}
 
 class MainActivity : ComponentActivity() {
     private val translationEngine = MlKitTranslationEngine()
@@ -113,37 +121,56 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val updateState by updateViewModel.uiState.collectAsState()
-                    val isServiceRunning by TranslatorController.isServiceRunning.collectAsState()
-                    val actions =
-                        DashboardActions(
-                            onRequestOverlayPermission = { requestOverlayPermission() },
-                            onStartService = { pair ->
-                                pendingLanguagePair = pair
-                                startScreenCapture()
-                            },
-                            onStopService = {
-                                TranslatorController.stop(this)
-                                Toast.makeText(this, "Screen Translator Stopped", Toast.LENGTH_SHORT).show()
-                            },
-                            onCheckUpdate = { updateViewModel.checkForUpdate() },
-                            onStartDownload = { release -> updateViewModel.startDownload(release) },
-                            onDismissUpdateDialog = { updateViewModel.dismissDialog() },
-                            onInstallApk = { apkFile -> triggerApkInstall(apkFile) },
-                            onDownloadModel = { pair, onComplete ->
-                                lifecycleScopeLaunch {
-                                    val success = translationEngine.ensureModelDownloaded(pair)
-                                    onComplete(success)
-                                }
-                            },
-                        )
+                    var currentScreen by remember { mutableStateOf(AppScreen.DASHBOARD) }
+                    val filterRepository = remember { FilterPreferencesRepository.getInstance(this@MainActivity) }
 
-                    TranslatorDashboard(
-                        hasOverlayPermission = hasOverlayPermission,
-                        isServiceRunning = isServiceRunning,
-                        updateState = updateState,
-                        actions = actions,
-                    )
+                    when (currentScreen) {
+                        AppScreen.DASHBOARD -> {
+                            val updateState by updateViewModel.uiState.collectAsState()
+                            val isServiceRunning by TranslatorController.isServiceRunning.collectAsState()
+                            val actions =
+                                DashboardActions(
+                                    onRequestOverlayPermission = { requestOverlayPermission() },
+                                    onStartService = { pair ->
+                                        pendingLanguagePair = pair
+                                        startScreenCapture()
+                                    },
+                                    onStopService = {
+                                        TranslatorController.stop(this@MainActivity)
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Screen Translator Stopped",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    },
+                                    onCheckUpdate = { updateViewModel.checkForUpdate() },
+                                    onStartDownload = { release -> updateViewModel.startDownload(release) },
+                                    onDismissUpdateDialog = { updateViewModel.dismissDialog() },
+                                    onInstallApk = { apkFile -> triggerApkInstall(apkFile) },
+                                    onDownloadModel = { pair, onComplete ->
+                                        lifecycleScopeLaunch {
+                                            val success = translationEngine.ensureModelDownloaded(pair)
+                                            onComplete(success)
+                                        }
+                                    },
+                                    onOpenSettings = { currentScreen = AppScreen.SETTINGS },
+                                )
+
+                            TranslatorDashboard(
+                                hasOverlayPermission = hasOverlayPermission,
+                                isServiceRunning = isServiceRunning,
+                                updateState = updateState,
+                                actions = actions,
+                            )
+                        }
+
+                        AppScreen.SETTINGS -> {
+                            SettingsScreen(
+                                repository = filterRepository,
+                                onNavigateBack = { currentScreen = AppScreen.DASHBOARD },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -266,6 +293,13 @@ fun TranslatorDashboard(
                 }
             },
         )
+
+        OutlinedButton(
+            onClick = actions.onOpenSettings,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.btn_filter_settings))
+        }
 
         OutlinedButton(
             onClick = actions.onCheckUpdate,
