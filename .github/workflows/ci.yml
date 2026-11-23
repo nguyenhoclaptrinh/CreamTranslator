@@ -16,6 +16,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   validate:
@@ -35,11 +36,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Mount RAM Disk for Build Cache
+        run: |
+          sudo mkdir -p app/build
+          sudo mount -t tmpfs -o size=2048m tmpfs app/build
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Run Quality Gate and Unit Tests
         run: ./gradlew spotlessCheck detekt lintDebug testDebugUnitTest --continue
+
+      - name: Publish Test Report to PR
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Test Results
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          reporter: java-junit
 
       - name: Upload Diagnostic Reports on Failure
         if: failure()
@@ -51,3 +65,38 @@ jobs:
             build/reports/
           retention-days: 7
           if-no-files-found: ignore
+
+  build-apk:
+    name: Build Assemble Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Mount RAM Disk for Build Output
+        run: |
+          sudo mkdir -p app/build
+          sudo mount -t tmpfs -o size=2048m tmpfs app/build
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Assemble Debug APK
+        run: ./gradlew assembleDebug -x test -x lint
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
