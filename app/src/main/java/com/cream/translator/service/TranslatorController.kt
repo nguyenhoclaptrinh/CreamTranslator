@@ -2,6 +2,7 @@ package com.cream.translator.service
 
 import android.content.Context
 import android.content.Intent
+import com.cream.translator.core.model.LanguagePair
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,7 @@ object TranslatorController {
         context: Context,
         resultCode: Int,
         resultData: Intent,
+        languagePair: LanguagePair = LanguagePair("en", "vi"),
     ) {
         try {
             val captureIntent =
@@ -35,7 +37,11 @@ object TranslatorController {
                 }
             context.startForegroundService(captureIntent)
 
-            val overlayIntent = Intent(context, OverlayService::class.java)
+            val overlayIntent =
+                Intent(context, OverlayService::class.java).apply {
+                    putExtra(OverlayService.EXTRA_SOURCE_LANG, languagePair.sourceLanguage)
+                    putExtra(OverlayService.EXTRA_TARGET_LANG, languagePair.targetLanguage)
+                }
             context.startService(overlayIntent)
 
             _isServiceRunning.value = true

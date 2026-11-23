@@ -3,6 +3,7 @@ package com.cream.translator.core.engine
 import android.graphics.Bitmap
 import android.graphics.Rect
 import com.cream.translator.core.model.TextRegion
+import com.cream.translator.ui.overlay.OverlayConfig
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -33,7 +34,10 @@ class MlKitOcrEngine : OcrEngine {
                     for (block in visionText.textBlocks) {
                         val box = block.boundingBox ?: Rect(0, 0, 0, 0)
                         val text = block.text.replace("\\s+".toRegex(), " ").trim()
-                        if (text.isNotBlank() && box.width() > 10 && box.height() > 10) {
+                        if (text.isNotBlank() &&
+                            box.width() > OverlayConfig.MIN_BOX_DIMENSION &&
+                            box.height() > OverlayConfig.MIN_BOX_DIMENSION
+                        ) {
                             regions.add(
                                 TextRegion(
                                     id = UUID.randomUUID().toString(),
