@@ -48,6 +48,7 @@ class FloatingTriggerController(
     @SuppressLint("ClickableViewAccessibility")
     fun setupFloatingTrigger(
         onClick: () -> Unit,
+        onDoubleTap: () -> Unit,
         onLongPress: () -> Unit,
     ): Boolean {
         if (!Settings.canDrawOverlays(context)) {
@@ -98,7 +99,7 @@ class FloatingTriggerController(
                 elevation = 14f
             }
 
-        attachDragAndClickListener(triggerButton, params, onClick, onLongPress)
+        attachDragAndClickListener(triggerButton, params, onClick, onDoubleTap, onLongPress)
 
         val attached = windowManager.safeAddView(triggerButton, params)
         return if (attached) {
@@ -146,6 +147,7 @@ class FloatingTriggerController(
         view: View,
         params: WindowManager.LayoutParams,
         onClick: () -> Unit,
+        onDoubleTap: () -> Unit,
         onLongPress: () -> Unit,
     ) {
         var initialX = 0
@@ -154,6 +156,9 @@ class FloatingTriggerController(
         var initialTouchY = 0f
         var isClick = true
         var longPressJob: Job? = null
+        var pendingSingleTapJob: Job? = null
+        var lastTapUpTimeMs = -1L
+        val doubleTapWindowMs = 300L
 
         view.setOnTouchListener { _, event ->
             when (event.action) {
@@ -170,6 +175,7 @@ class FloatingTriggerController(
                             delay(800)
                             if (isClick) {
                                 isClick = false
+                                pendingSingleTapJob?.cancel()
                                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                 onLongPress()
                             }
@@ -183,7 +189,9 @@ class FloatingTriggerController(
                         Math.abs(dy) > OverlayConfig.TRIGGER_DRAG_THRESHOLD
                     ) {
                         isClick = false
+                        lastTapUpTimeMs = -1L
                         longPressJob?.cancel()
+                        pendingSingleTapJob?.cancel()
                     }
                     val screenWidth = windowManager.getScreenWidth()
                     val screenHeight = windowManager.getScreenHeight()
@@ -200,7 +208,27 @@ class FloatingTriggerController(
                 MotionEvent.ACTION_UP -> {
                     longPressJob?.cancel()
                     if (isClick) {
-                        onClick()
+                        val now = android.os.SystemClock.uptimeMillis()
+                        if (lastTapUpTimeMs >= 0L && now - lastTapUpTimeMs <= doubleTapWindowMs) {
+                            // Double-tap xác nhận: hủy single-tap đang chờ và gọi onDoubleTap
+                            pendingSingleTapJob?.cancel()
+                            lastTapUpTimeMs = -1L
+                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            onDoubleTap()
+                        } else {
+                            // Tap đầu tiên: ghi lại thời điểm, chờ xem có double-tap không
+                            val capturedTime = now
+                            lastTapUpTimeMs = capturedTime
+                            pendingSingleTapJob =
+                                coroutineScope.launch {
+                                    delay(doubleTapWindowMs + 20)
+                                    // Nếu lastTapUpTimeMs vẫn là capturedTime → không có double-tap
+                                    if (lastTapUpTimeMs == capturedTime) {
+                                        lastTapUpTimeMs = -1L
+                                        onClick()
+                                    }
+                                }
+                        }
                     } else {
                         animateSnapToEdge(view, params)
                     }
@@ -208,6 +236,8 @@ class FloatingTriggerController(
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     longPressJob?.cancel()
+                    pendingSingleTapJob?.cancel()
+                    lastTapUpTimeMs = -1L
                     if (!isClick) {
                         animateSnapToEdge(view, params)
                     }

@@ -25,6 +25,8 @@ import com.cream.translator.ui.overlay.FloatingTriggerController
 import com.cream.translator.ui.overlay.IOverlayWindowManager
 import com.cream.translator.ui.overlay.OverlayConfig
 import com.cream.translator.ui.overlay.OverlayWindowManager
+import com.cream.translator.ui.overlay.RegionTranslateController
+import com.cream.translator.ui.overlay.RegionTranslateHooks
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +65,20 @@ class OverlayService : Service() {
         FloatingTriggerController(this, overlayWindowManager, serviceScope)
     }
 
+    private val regionTranslateController: RegionTranslateController by lazy {
+        RegionTranslateController(
+            context = this,
+            overlayWindowManager = overlayWindowManager,
+            pipelineCoordinator = pipelineCoordinator,
+            floatingTriggerController = floatingTriggerController,
+            serviceScope = serviceScope,
+            hooks =
+                RegionTranslateHooks(
+                    languagePairProvider = { currentLanguagePair },
+                ),
+        )
+    }
+
     private val filterPreferencesRepository by lazy { FilterPreferencesRepository.getInstance(this) }
     private val textFilter by lazy { DefaultTextFilter { filterPreferencesRepository.getConfig() } }
 
@@ -94,6 +110,11 @@ class OverlayService : Service() {
                     Intent.ACTION_CLOSE_SYSTEM_DIALOGS,
                     -> {
                         overlayWindowManager.dismissTranslationOverlay()
+                        overlayWindowManager.dismissRegionSelector()
+                        if (pipelineCoordinator.state.value is TranslationState.RegionSelecting) {
+                            floatingTriggerController.setVisibility(true)
+                            pipelineCoordinator.updateState(TranslationState.Idle)
+                        }
                     }
                 }
             }
@@ -125,6 +146,7 @@ class OverlayService : Service() {
         val attached =
             floatingTriggerController.setupFloatingTrigger(
                 onClick = { handleTriggerClick() },
+                onDoubleTap = { regionTranslateController.activateRegionSelectMode() },
                 onLongPress = { handleTriggerLongPress() },
             )
         if (attached) {
@@ -169,7 +191,10 @@ class OverlayService : Service() {
         }
 
         val currentState = pipelineCoordinator.state.value
-        if (currentState is TranslationState.Capturing || currentState is TranslationState.Processing) {
+        if (currentState is TranslationState.Capturing ||
+            currentState is TranslationState.Processing ||
+            currentState is TranslationState.RegionSelecting
+        ) {
             Toast.makeText(this, getString(R.string.overlay_processing_wait), Toast.LENGTH_SHORT).show()
             return
         }
@@ -270,6 +295,11 @@ class OverlayService : Service() {
             overlayWindowManager.dismissTranslationOverlay()
             pipelineCoordinator.updateState(TranslationState.Idle)
         }
+        if (pipelineCoordinator.state.value is TranslationState.RegionSelecting) {
+            overlayWindowManager.dismissRegionSelector()
+            floatingTriggerController.setVisibility(true)
+            pipelineCoordinator.updateState(TranslationState.Idle)
+        }
         floatingTriggerController.handleConfigurationChange()
         Timber.d("OverlayService configuration changed and views adjusted")
     }
@@ -282,6 +312,7 @@ class OverlayService : Service() {
         }
 
         overlayWindowManager.dismissTranslationOverlay()
+        overlayWindowManager.dismissRegionSelector()
         floatingTriggerController.destroy()
         pipelineCoordinator.close()
         serviceScope.cancel()
