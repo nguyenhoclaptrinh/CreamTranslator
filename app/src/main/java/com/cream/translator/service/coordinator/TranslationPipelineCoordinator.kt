@@ -1,11 +1,13 @@
 package com.cream.translator.service.coordinator
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import com.cream.translator.core.engine.OcrEngine
 import com.cream.translator.core.engine.TextInpainter
 import com.cream.translator.core.engine.TranslationEngine
 import com.cream.translator.core.engine.filter.TextFilter
 import com.cream.translator.core.model.LanguagePair
+import com.cream.translator.core.model.PixelOffset
 import com.cream.translator.core.model.TranslationResult
 import com.cream.translator.core.model.TranslationState
 import com.cream.translator.core.model.error.CreamError
@@ -39,11 +41,12 @@ class TranslationPipelineCoordinator(
         bitmap: Bitmap,
         languagePair: LanguagePair,
         tracerSession: PipelineTracer.Session,
+        regionOffset: PixelOffset,
     ): List<TranslationResult>? {
         return try {
             _state.value = TranslationState.Processing("OCR")
 
-            // 1. Chạy OCR On-Device
+            // 1. Chạy OCR On-Device trên Bitmap đã cho (toàn màn hình hoặc đã crop)
             val textRegions =
                 tracerSession.measureOcr {
                     withContext(defaultDispatcher) {
@@ -74,7 +77,7 @@ class TranslationPipelineCoordinator(
 
             _state.value = TranslationState.Processing("Translate")
 
-            // 3. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
+            // 3. Dịch on-device, lấy mẫu màu nền và áp offset tọa độ (nếu có)
             val results =
                 withContext(defaultDispatcher) {
                     val textsToTranslate = eligibleRegions.map { it.originalText }
@@ -88,10 +91,29 @@ class TranslationPipelineCoordinator(
 
                     tracerSession.measureInpaint {
                         eligibleRegions.mapIndexed { index, region ->
+                            // Luôn sample màu từ tọa độ gốc của Bitmap (trước khi áp offset).
+                            // Bitmap ở đây là Bitmap đã crop → tọa độ region.boundingBox là tọa độ
+                            // tương đối so với crop, đúng để sample pixel.
                             val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
                             val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
+
+                            // Áp offset tọa độ SAU khi sample màu để boundingBox khớp với tọa độ
+                            // màn hình tuyệt đối cho InPlaceTranslationOverlay render đúng vị trí.
+                            val screenBoundingBox =
+                                if (regionOffset.isZero) {
+                                    region.boundingBox
+                                } else {
+                                    Rect(
+                                        region.boundingBox.left + regionOffset.x,
+                                        region.boundingBox.top + regionOffset.y,
+                                        region.boundingBox.right + regionOffset.x,
+                                        region.boundingBox.bottom + regionOffset.y,
+                                    )
+                                }
+
                             val enrichedRegion =
                                 region.copy(
+                                    boundingBox = screenBoundingBox,
                                     backgroundColor = sampledBg,
                                     textColor = contrastingText,
                                 )
