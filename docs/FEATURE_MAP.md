@@ -111,7 +111,7 @@ flowchart TD
 
 ### Tầng 1: Nền tảng Cốt lõi & An toàn Hệ thống (Current Production: v1.0 - v1.3+)
 Trạng thái: **Đã triển khai hoàn tất và kiểm chứng ổn định trên môi trường thực tế**.
-- **Chụp màn hình an toàn**: `ScreenCaptureManager` tích hợp bộ lắng nghe trạng thái và tự động tính toán lại tỷ lệ `VirtualDisplay` khi xoay ngang/dọc, tuân thủ nghiêm ngặt bất biến của Android 14+. Hỗ trợ `captureRegion(Rect)` cắt vùng chọn an toàn kèm giải phóng `Bitmap` gốc (`cropped !== full`).
+- **Chụp màn hình an toàn**: `ScreenCaptureManager` tích hợp bộ lắng nghe trạng thái và tự động tính toán lại tỷ lệ `VirtualDisplay` khi xoay ngang/dọc, tuân thủ nghiêm ngặt bất biến của Android 14+. `ScreenCaptureService.captureRegion(Rect)` hỗ trợ cắt vùng chọn an toàn kèm giải phóng `Bitmap` gốc (`cropped !== full`).
 - **Pipeline xử lý cục bộ**: Kết nối trực tiếp với Google ML Kit On-Device v2; tốc độ nhận diện và dịch Tiếng Anh - Tiếng Việt đạt độ trễ trung bình dưới 350ms. Hỗ trợ `PixelOffset` ánh xạ tọa độ từ vùng crop về không gian màn hình tuyệt đối sau bước lấy mẫu màu nền.
 - **Vẽ đè thông minh**: `InPlaceTranslationOverlay` phối hợp cùng `TextInpainter` lấy mẫu màu viền nền của hộp thoại, tính toán độ tương phản để chọn màu chữ tối ưu và render bằng `StaticLayout`.
 - **Tương tác linh hoạt**: Hỗ trợ chạm đơn để dịch toàn bộ màn hình, chạm đôi nút nổi (300ms) để kích hoạt chọn vùng (`RegionTranslateController` + `RegionSelectorView` có lớp nền tối, hủy khi chạm nhẹ và auto-dismiss 10 giây), chạm vào ô dịch để đổi nhanh giữa tiếng Việt và tiếng Anh gốc.
@@ -164,7 +164,7 @@ Trạng thái: **Kế hoạch phát triển trung hạn**.
 - **Phát âm thoại ngoại tuyến (Offline TTS Integration)**:
   - Tận dụng Text-To-Speech nội bộ của Android để đọc to bản dịch tiếng Việt cho người dùng muốn nghe giọng đọc tự nhiên.
 - **Nhận diện chữ dọc truyện tranh (Vertical Text OCR)**:
-  - Cải tiến thuật toán gom cụm dòng chữ (`LineClustering`) để xử lý văn bản xếp theo chiều dọc trong truyện tranh Nhật Bản và tiểu thuyết Trung Quốc.
+  - Cải tiến thuật toán gom cụm dòng chữ trong `MlKitOcrEngine` để xử lý văn bản xếp theo chiều dọc trong truyện tranh Nhật Bản và tiểu thuyết Trung Quốc.
 
 ---
 
