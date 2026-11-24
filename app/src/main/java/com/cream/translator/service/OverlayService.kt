@@ -24,6 +24,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import com.cream.translator.CreamTranslatorApp
 import com.cream.translator.R
 import com.cream.translator.core.engine.MlKitOcrEngine
 import com.cream.translator.core.engine.MlKitTranslationEngine
@@ -33,6 +34,7 @@ import com.cream.translator.core.model.LanguagePair
 import com.cream.translator.core.model.TranslationResult
 import com.cream.translator.core.model.TranslationState
 import com.cream.translator.core.model.error.CreamError
+import com.cream.translator.core.monitoring.metrics.PipelineTracer
 import com.cream.translator.core.util.createNamedExceptionHandler
 import com.cream.translator.data.repository.FilterPreferencesRepository
 import com.cream.translator.ui.overlay.InPlaceTranslationOverlay
@@ -78,6 +80,8 @@ class OverlayService : Service() {
     private val _state = MutableStateFlow<TranslationState>(TranslationState.Idle)
     val state: StateFlow<TranslationState> = _state.asStateFlow()
     private var currentLanguagePair = LanguagePair("en", "vi")
+    private val pipelineTracer: PipelineTracer
+        get() = (applicationContext as? CreamTranslatorApp)?.pipelineTracer ?: PipelineTracer()
 
     private val systemEventsReceiver =
         object : BroadcastReceiver() {
@@ -340,6 +344,7 @@ class OverlayService : Service() {
         }
 
         _state.value = TranslationState.Capturing
+        val session = pipelineTracer.startSession()
         serviceScope.launch {
             try {
                 // 1. Ẩn nút nổi tạm thời để không bị dính vào ảnh chụp màn hình
@@ -357,10 +362,14 @@ class OverlayService : Service() {
                         Toast.LENGTH_SHORT,
                     ).show()
                     floatingTriggerView?.visibility = View.VISIBLE
+                    session.finish(isSuccess = false, errorMessage = "CaptureService is null")
                     return@launch
                 }
 
-                val bitmap = captureService.captureCurrentScreen()
+                val bitmap =
+                    session.measureCapture {
+                        captureService.captureCurrentScreen()
+                    }
                 floatingTriggerView?.visibility = View.VISIBLE
 
                 if (bitmap == null) {
@@ -371,21 +380,31 @@ class OverlayService : Service() {
                         getString(R.string.overlay_capture_failed),
                         Toast.LENGTH_SHORT,
                     ).show()
+                    session.finish(isSuccess = false, errorMessage = "Frame acquire timeout")
                     return@launch
                 }
 
-                val results = processScreenCapture(bitmap) ?: return@launch
+                val results =
+                    processScreenCapture(bitmap, session) ?: run {
+                        session.finish(isSuccess = false, errorMessage = "No eligible text or OCR failed")
+                        return@launch
+                    }
 
                 // 5. Hiển thị lớp phủ dịch đè trực tiếp (In-Place Translation Overlay)
                 _state.value = TranslationState.Success(results)
-                displayTranslationOverlay(results)
+                session.measureRender {
+                    displayTranslationOverlay(results)
+                }
+                session.finish(isSuccess = true)
             } catch (cancellation: CancellationException) {
                 _state.value = TranslationState.Idle
+                session.finish(isSuccess = false, errorMessage = "Job cancelled")
                 throw cancellation
             } catch (e: Throwable) {
                 Timber.e(e, "Lỗi trong quá trình dịch màn hình")
                 val err = CreamError.TranslationError.InferenceFailed(e)
                 _state.value = TranslationState.Error(err)
+                session.finish(isSuccess = false, errorMessage = e.message)
                 Toast.makeText(
                     this@OverlayService,
                     getString(R.string.overlay_error_prefix, e.message ?: ""),
@@ -400,7 +419,10 @@ class OverlayService : Service() {
         }
     }
 
-    private suspend fun processScreenCapture(bitmap: Bitmap): List<TranslationResult>? {
+    private suspend fun processScreenCapture(
+        bitmap: Bitmap,
+        session: PipelineTracer.Session,
+    ): List<TranslationResult>? {
         return try {
             _state.value = TranslationState.Processing("OCR")
             Toast.makeText(
@@ -411,9 +433,12 @@ class OverlayService : Service() {
 
             // 3. Chạy OCR On-Device bằng ML Kit
             val textRegions =
-                withContext(Dispatchers.Default) {
-                    ocrEngine.recognizeText(bitmap)
+                session.measureOcr {
+                    withContext(Dispatchers.Default) {
+                        ocrEngine.recognizeText(bitmap)
+                    }
                 }
+            session.recognizedBlocks = textRegions.size
 
             if (textRegions.isEmpty()) {
                 val err = CreamError.OcrError.ZeroRegionsDetected()
@@ -428,8 +453,10 @@ class OverlayService : Service() {
 
             // Lọc bỏ các khối chữ thuộc danh sách từ phổ biến/ký hiệu hoặc không tương thích ngôn ngữ
             val eligibleRegions =
-                textRegions.filterNot {
-                    textFilter.shouldFilter(it.originalText, currentLanguagePair)
+                session.measureFilter {
+                    textRegions.filterNot {
+                        textFilter.shouldFilter(it.originalText, currentLanguagePair)
+                    }
                 }
 
             if (eligibleRegions.isEmpty()) {
@@ -451,31 +478,36 @@ class OverlayService : Service() {
             ).show()
 
             // 4. Dịch on-device và lấy mẫu màu nền thông minh (Inpainting)
-            withContext(Dispatchers.Default) {
-                val startTime = System.currentTimeMillis()
-                val textsToTranslate = eligibleRegions.map { it.originalText }
-                val translatedTexts =
-                    translationEngine.translateBatch(
-                        textsToTranslate,
-                        currentLanguagePair,
-                    )
-                val duration = System.currentTimeMillis() - startTime
+            val results =
+                withContext(Dispatchers.Default) {
+                    val textsToTranslate = eligibleRegions.map { it.originalText }
+                    val translatedTexts =
+                        session.measureTranslate {
+                            translationEngine.translateBatch(
+                                textsToTranslate,
+                                currentLanguagePair,
+                            )
+                        }
 
-                eligibleRegions.mapIndexed { index, region ->
-                    val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
-                    val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
-                    val enrichedRegion =
-                        region.copy(
-                            backgroundColor = sampledBg,
-                            textColor = contrastingText,
-                        )
-                    TranslationResult(
-                        region = enrichedRegion,
-                        translatedText = translatedTexts.getOrElse(index) { region.originalText },
-                        executionTimeMs = duration,
-                    )
+                    session.measureInpaint {
+                        eligibleRegions.mapIndexed { index, region ->
+                            val sampledBg = TextInpainter.sampleBackgroundColor(bitmap, region.boundingBox)
+                            val contrastingText = TextInpainter.calculateContrastingTextColor(sampledBg)
+                            val enrichedRegion =
+                                region.copy(
+                                    backgroundColor = sampledBg,
+                                    textColor = contrastingText,
+                                )
+                            TranslationResult(
+                                region = enrichedRegion,
+                                translatedText = translatedTexts.getOrElse(index) { region.originalText },
+                                executionTimeMs = 0L,
+                            )
+                        }
+                    }
                 }
-            }
+            session.translatedBlocks = results.size
+            results
         } finally {
             // Prevent native graphic memory leaks by immediately recycling full-frame capture
             bitmap.recycle()
@@ -508,10 +540,13 @@ class OverlayService : Service() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT,
             ).apply {
-                gravity = Gravity.TOP or Gravity.START
+                gravity = Gravity.TOP or Gravity.LEFT
                 x = 0
                 y = 0
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }

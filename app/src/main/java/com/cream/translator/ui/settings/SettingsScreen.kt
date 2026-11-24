@@ -115,6 +115,10 @@ fun SettingsScreen(
                 Text("Khôi phục bộ lọc về mặc định")
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DiagnosticsCard()
+
             Spacer(modifier = Modifier.height(16.dp))
         }
 

@@ -1,4 +1,4 @@
-# ADR-004: AI-Agent-Optimized Layered Architecture and Testing Harness
+# ADR-005: AI-Agent-Optimized Layered Architecture and Testing Harness
 
 ## Status
 Accepted
