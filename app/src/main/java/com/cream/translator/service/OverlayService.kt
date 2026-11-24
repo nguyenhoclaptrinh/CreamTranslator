@@ -116,8 +116,10 @@ class OverlayService : Service() {
                 filter,
                 ContextCompat.RECEIVER_EXPORTED,
             )
-        } catch (e: Throwable) {
-            Timber.w(e, "Không thể đăng ký systemEventsReceiver")
+        } catch (e: SecurityException) {
+            Timber.w(e, "Không thể đăng ký systemEventsReceiver do thiếu quyền")
+        } catch (e: IllegalArgumentException) {
+            Timber.w(e, "Tham số không hợp lệ khi đăng ký systemEventsReceiver")
         }
 
         val attached =
@@ -158,6 +160,7 @@ class OverlayService : Service() {
         TranslatorController.stop(this@OverlayService)
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun handleTriggerClick() {
         if (overlayWindowManager.isOverlayShowing) {
             overlayWindowManager.dismissTranslationOverlay()
@@ -274,8 +277,8 @@ class OverlayService : Service() {
     override fun onDestroy() {
         try {
             unregisterReceiver(systemEventsReceiver)
-        } catch (e: Throwable) {
-            Timber.w(e, "Lỗi unregister systemEventsReceiver")
+        } catch (e: IllegalArgumentException) {
+            Timber.w(e, "Lỗi unregister systemEventsReceiver: receiver chưa từng được đăng ký")
         }
 
         overlayWindowManager.dismissTranslationOverlay()

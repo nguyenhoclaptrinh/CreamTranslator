@@ -194,8 +194,12 @@ private suspend fun exportDiagnosticReport(
         val chooser = Intent.createChooser(shareIntent, "Chia sẻ báo cáo chẩn đoán")
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
-    } catch (e: Exception) {
-        Toast.makeText(context, "Lỗi khi xuất chẩn đoán: ${e.message}", Toast.LENGTH_SHORT).show()
+    } catch (e: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "Không tìm thấy ứng dụng chia sẻ: ${e.message}", Toast.LENGTH_SHORT).show()
+    } catch (e: SecurityException) {
+        Toast.makeText(context, "Không đủ quyền chia sẻ: ${e.message}", Toast.LENGTH_SHORT).show()
+    } catch (e: java.io.IOException) {
+        Toast.makeText(context, "Lỗi đọc ghi tệp chẩn đoán: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
 

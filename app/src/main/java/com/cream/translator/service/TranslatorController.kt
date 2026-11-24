@@ -46,8 +46,11 @@ object TranslatorController {
 
             _isServiceRunning.value = true
             Timber.i("TranslatorController: Bắt đầu toàn bộ dịch vụ phiên dịch màn hình")
-        } catch (e: Throwable) {
-            Timber.e(e, "TranslatorController: Lỗi khi khởi chạy dịch vụ")
+        } catch (e: SecurityException) {
+            Timber.e(e, "TranslatorController: Không đủ quyền khởi chạy dịch vụ")
+            _isServiceRunning.value = false
+        } catch (e: IllegalStateException) {
+            Timber.e(e, "TranslatorController: Không thể khởi chạy dịch vụ ở trạng thái hiện tại")
             _isServiceRunning.value = false
         }
     }
@@ -67,8 +70,10 @@ object TranslatorController {
             context.stopService(Intent(context, ScreenCaptureService::class.java))
 
             Timber.i("TranslatorController: Đã gửi lệnh dừng toàn bộ dịch vụ phiên dịch")
-        } catch (e: Throwable) {
-            Timber.e(e, "TranslatorController: Lỗi khi dừng dịch vụ")
+        } catch (e: SecurityException) {
+            Timber.e(e, "TranslatorController: Không đủ quyền dừng dịch vụ")
+        } catch (e: IllegalStateException) {
+            Timber.e(e, "TranslatorController: Lỗi trạng thái khi dừng dịch vụ")
         } finally {
             isStopping = false
         }

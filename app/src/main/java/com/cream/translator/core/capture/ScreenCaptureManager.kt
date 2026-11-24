@@ -20,6 +20,20 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
 
+sealed interface CaptureLifecycleState {
+    data object Uninitialized : CaptureLifecycleState
+
+    data object CallbackRegistered : CaptureLifecycleState
+
+    data class Active(
+        val width: Int,
+        val height: Int,
+        val density: Int,
+    ) : CaptureLifecycleState
+
+    data object Stopped : CaptureLifecycleState
+}
+
 class ScreenCaptureManager(
     private val context: Context,
     private val mediaProjection: MediaProjection,
@@ -35,6 +49,10 @@ class ScreenCaptureManager(
     var isProjectionActive: Boolean = true
         private set
 
+    @Volatile
+    var lifecycleState: CaptureLifecycleState = CaptureLifecycleState.Uninitialized
+        private set
+
     var onStopCallback: (() -> Unit)? = null
 
     private val projectionCallback =
@@ -42,6 +60,7 @@ class ScreenCaptureManager(
             override fun onStop() {
                 super.onStop()
                 isProjectionActive = false
+                lifecycleState = CaptureLifecycleState.Stopped
                 release()
                 onStopCallback?.invoke()
             }
@@ -51,6 +70,7 @@ class ScreenCaptureManager(
         // Android 14+ (API 34+) strictly requires registering a MediaProjection.Callback
         // before createVirtualDisplay() is called, otherwise throwing IllegalStateException.
         mediaProjection.registerCallback(projectionCallback, Handler(Looper.getMainLooper()))
+        lifecycleState = CaptureLifecycleState.CallbackRegistered
         updateScreenDimensions()
         setupVirtualDisplay()
     }
@@ -118,9 +138,12 @@ class ScreenCaptureManager(
                         null,
                         null,
                     )
+                lifecycleState = CaptureLifecycleState.Active(screenWidth, screenHeight, screenDensity)
                 Timber.d("VirtualDisplay initialized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to initialize VirtualDisplay")
+            } catch (e: SecurityException) {
+                Timber.e(e, "SecurityException initializing VirtualDisplay")
+            } catch (e: IllegalStateException) {
+                Timber.e(e, "IllegalStateException initializing VirtualDisplay")
             }
         }
     }
@@ -146,9 +169,12 @@ class ScreenCaptureManager(
                 currentDisplay.resize(screenWidth, screenHeight, screenDensity)
                 currentDisplay.surface = newReader.surface
                 oldReader?.close()
+                lifecycleState = CaptureLifecycleState.Active(screenWidth, screenHeight, screenDensity)
                 Timber.i("VirtualDisplay resized: %dx%d @ %ddpi", screenWidth, screenHeight, screenDensity)
-            } catch (e: Exception) {
-                Timber.e(e, "Error resizing VirtualDisplay")
+            } catch (e: IllegalArgumentException) {
+                Timber.e(e, "IllegalArgumentException resizing VirtualDisplay")
+            } catch (e: IllegalStateException) {
+                Timber.e(e, "IllegalStateException resizing VirtualDisplay")
             }
         }
     }
@@ -199,9 +225,17 @@ class ScreenCaptureManager(
             } catch (cancellation: CancellationException) {
                 rawBitmap?.recycle()
                 throw cancellation
-            } catch (e: Throwable) {
+            } catch (e: IllegalStateException) {
                 rawBitmap?.recycle()
-                Timber.e(e, "Error capturing screen frame")
+                Timber.e(e, "IllegalStateException capturing screen frame")
+                null
+            } catch (e: UnsupportedOperationException) {
+                rawBitmap?.recycle()
+                Timber.e(e, "UnsupportedOperationException capturing screen frame")
+                null
+            } catch (e: IllegalArgumentException) {
+                rawBitmap?.recycle()
+                Timber.e(e, "IllegalArgumentException capturing screen frame")
                 null
             } finally {
                 image?.close()
@@ -215,10 +249,13 @@ class ScreenCaptureManager(
 
     fun release() {
         synchronized(displayLock) {
+            lifecycleState = CaptureLifecycleState.Stopped
             try {
                 mediaProjection.unregisterCallback(projectionCallback)
-            } catch (_: Exception) {
+            } catch (_: IllegalArgumentException) {
                 // Callback might already be unregistered or projection stopped
+            } catch (_: IllegalStateException) {
+                // Projection already stopped
             }
             try {
                 virtualDisplay?.release()
@@ -227,7 +264,7 @@ class ScreenCaptureManager(
                 imageReader = null
                 mediaProjection.stop()
                 Timber.d("ScreenCaptureManager released safely")
-            } catch (e: Exception) {
+            } catch (e: IllegalStateException) {
                 Timber.e(e, "Error releasing ScreenCaptureManager")
             }
         }

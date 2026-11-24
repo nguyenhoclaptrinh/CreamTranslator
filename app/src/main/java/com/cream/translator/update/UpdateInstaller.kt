@@ -59,8 +59,14 @@ object UpdateInstaller {
                 context.startActivity(intent)
                 Result.success(Unit)
             }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to launch package installer for ${apkFile.absolutePath}")
+        } catch (e: android.content.ActivityNotFoundException) {
+            Timber.e(e, "No installer application found for ${apkFile.absolutePath}")
+            Result.failure(e)
+        } catch (e: IllegalArgumentException) {
+            Timber.e(e, "Failed to resolve content URI for ${apkFile.absolutePath}")
+            Result.failure(e)
+        } catch (e: SecurityException) {
+            Timber.e(e, "SecurityException launching package installer")
             Result.failure(e)
         }
 }

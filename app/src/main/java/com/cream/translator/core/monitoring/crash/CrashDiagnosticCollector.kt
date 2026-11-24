@@ -27,6 +27,7 @@ class CrashDiagnosticCollector(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun uncaughtException(
         thread: Thread,
         throwable: Throwable,
