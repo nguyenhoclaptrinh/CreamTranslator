@@ -13,7 +13,7 @@ Tài liệu này là chỉ dẫn hệ thống bắt buộc dành cho mọi AI co
 | **Kiến trúc Mã nguồn** | [.agents/rules/architecture-invariants.md](file:///.agents/rules/architecture-invariants.md) | Layered Interface-First; Service là Thin Host; giải phóng Bitmap (`recycle()`); không lưu static Context. |
 | **Bất biến Android 14+** | [.agents/rules/android-invariants.md](file:///.agents/rules/android-invariants.md) | Đăng ký `MediaProjection.Callback` TRƯỚC KHI gọi `createVirtualDisplay()`; ForegroundService notification. |
 | **Kiểm thử Tự động** | [.agents/rules/testing-standards.md](file:///.agents/rules/testing-standards.md) | Không gọi Android framework tĩnh trong JVM test; sử dụng Robolectric và Fakes; kiểm thử luồng bằng Turbine. |
-| **Quy trình Git & PR** | [.agents/rules/git-workflow.md](file:///.agents/rules/git-workflow.md) | Bảo vệ nhánh `main`; Conventional Commits; đồng bộ nhánh trước khi mở PR; **tuyệt đối không tự ý merge PR**. |
+| **Quy trình Git & PR** | [.agents/rules/git-workflow.md](file:///.agents/rules/git-workflow.md) | Bảo vệ nhánh `main`; Conventional Commits; đồng bộ nhánh trước khi mở PR; review, fix và merge qua subagent (hoặc dừng chờ nếu chưa có lệnh merge). |
 
 ---
 
@@ -61,8 +61,8 @@ gh pr create --title "<type>(<pham-vi>): <tieu-de>" --body "<Mo-ta-chi-tiet-thay
 # 8. Giám sát các CI checks trên PR cho tới khi toàn bộ xanh
 gh pr checks <pr-number> --watch
 
-# 9. Báo cáo kết quả và DỪNG LẠI (Chờ người dùng review & quyết định merge)
-# TUYỆT ĐỐI KHÔNG tự chạy 'gh pr merge' trừ khi có lệnh tường minh từ người dùng!
+# 9. Giao phó subagent (TypeName: "self", Workspace: "share") review, fix finding, xác minh CI và merge PR
+# (Hoặc dừng lại báo cáo nếu chưa có lệnh merge / người dùng yêu cầu review thủ công)
 ```
 
 ---
