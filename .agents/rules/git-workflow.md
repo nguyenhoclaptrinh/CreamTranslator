@@ -11,10 +11,11 @@ Tài liệu này định nghĩa quy trình Git 7 bước chuẩn mực và các 
    - **CẤM TUYỆT ĐỐI**: Không bao giờ commit hoặc push trực tiếp lên nhánh `main`.
    - Mọi thay đổi bắt buộc phải đi qua feature branch và Pull Request (PR) nhắm vào `main`.
 
-2. **Ranh giới Bàn giao & Thẩm quyền Merge PR**:
-   - Agent **CHỈ ĐƯỢC PHÉP**: Tạo PR, kiểm tra tính đồng bộ với `main`, giám sát các checks CI chạy xanh hoàn toàn và báo cáo kết quả cho người dùng.
-   - **DỪNG LẠI TẠI ĐÂY**: Chờ người dùng tự review và quyết định.
-   - **TUYỆT ĐỐI KHÔNG TỰ MERGE PR** (`gh pr merge`) trừ khi có mệnh lệnh rõ ràng, tường minh từ người dùng.
+2. **Quy trình Review, Fix & Merge PR qua Subagent**:
+   - Sau khi tạo PR và CI chạy xanh, **luôn sử dụng subagent** (`invoke_subagent` với `TypeName: "self"`, `Workspace: "share"`) để review PR, sửa các finding phát hiện được, xác minh lại CI và merge PR:
+     - Prompt chuẩn cho subagent: `"Hãy review PR <pr-id> và fix các finding, sau đó merge PR."`
+   - Nếu không có lệnh merge hoặc người dùng yêu cầu giữ PR ở trạng thái chờ review thủ công, dừng lại sau khi CI xanh và báo cáo kết quả.
+   - Sau khi subagent merge PR thành công, đồng bộ lại nhánh `main` cục bộ (`git pull origin main`) và bất kỳ worktree nào đang hoạt động.
 
 ---
 
