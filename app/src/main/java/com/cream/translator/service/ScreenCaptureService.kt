@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Binder
@@ -140,6 +141,37 @@ class ScreenCaptureService : Service() {
     }
 
     suspend fun captureCurrentScreen(): Bitmap? = captureManager?.captureFrame()
+
+    /**
+     * Chụp toàn màn hình rồi crop đúng vùng [region].
+     * Đảm bảo Bitmap toàn màn hình được recycle() ngay sau khi crop xong.
+     * Trả về null nếu chụp thất bại hoặc vùng crop không hợp lệ.
+     */
+    suspend fun captureRegion(region: Rect): Bitmap? {
+        val full = captureCurrentScreen() ?: return null
+        return try {
+            val safeLeft = region.left.coerceIn(0, full.width - 1)
+            val safeTop = region.top.coerceIn(0, full.height - 1)
+            val safeRight = region.right.coerceIn(safeLeft + 1, full.width)
+            val safeBottom = region.bottom.coerceIn(safeTop + 1, full.height)
+            val w = safeRight - safeLeft
+            val h = safeBottom - safeTop
+            if (w <= 0 || h <= 0) {
+                Timber.w("captureRegion: vùng crop kích thước không hợp lệ w=%d h=%d", w, h)
+                full.recycle()
+                return null
+            }
+            val cropped = Bitmap.createBitmap(full, safeLeft, safeTop, w, h)
+            // createBitmap đôi khi trả về cùng đối tượng nếu vùng = toàn ảnh —
+            // chỉ recycle full nếu chắc chắn là đối tượng khác biệt.
+            if (cropped !== full) full.recycle()
+            cropped
+        } catch (e: IllegalArgumentException) {
+            Timber.e(e, "captureRegion: vùng crop không hợp lệ: %s", region)
+            full.recycle()
+            null
+        }
+    }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)

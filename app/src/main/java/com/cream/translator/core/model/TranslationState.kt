@@ -7,6 +7,12 @@ sealed interface TranslationState {
 
     data object Capturing : TranslationState
 
+    /**
+     * Người dùng đang kéo chọn vùng màn hình (RegionSelectorView đang hiển thị).
+     * Guard state này ngăn toàn bộ pipeline song song khi chế độ chọn vùng đang hoạt động.
+     */
+    data object RegionSelecting : TranslationState
+
     data class Processing(val stage: String) : TranslationState
 
     data class Success(val results: List<TranslationResult>) : TranslationState

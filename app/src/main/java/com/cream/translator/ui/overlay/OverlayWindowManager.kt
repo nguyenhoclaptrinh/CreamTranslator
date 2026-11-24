@@ -2,12 +2,14 @@ package com.cream.translator.ui.overlay
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import com.cream.translator.core.model.TranslationResult
+import kotlinx.coroutines.CoroutineScope
 import timber.log.Timber
 
 /**
@@ -19,8 +21,19 @@ class OverlayWindowManager(
         context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager,
 ) : IOverlayWindowManager {
     private var inPlaceOverlay: InPlaceTranslationOverlay? = null
+    private var regionSelectorView: RegionSelectorView? = null
+
     override var isOverlayShowing: Boolean = false
         private set
+
+    private val layoutType: Int
+        get() =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
 
     override fun getScreenWidth(): Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -47,14 +60,6 @@ class OverlayWindowManager(
         }
 
         if (windowManager == null) return false
-
-        val layoutType =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
 
         val overlayParams =
             WindowManager.LayoutParams(
@@ -108,6 +113,68 @@ class OverlayWindowManager(
         } else {
             false
         }
+    }
+
+    override fun showRegionSelector(
+        scope: CoroutineScope,
+        onRegionSelected: (Rect) -> Unit,
+        onCancel: () -> Unit,
+    ): Boolean {
+        dismissRegionSelector()
+        if (windowManager == null) return false
+
+        // QUAN TRỌNG: Dùng cùng bộ cờ window layout với InPlaceTranslationOverlay
+        // để đảm bảo tọa độ touch nhất quán trên mọi thiết bị (kể cả notch/punch-hole).
+        // Bỏ FLAG_NOT_TOUCH_MODAL để RegionSelectorView nhận toàn bộ touch event độc quyền.
+        val selectorParams =
+            WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = 0
+                y = 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+
+        val selectorView =
+            RegionSelectorView(context).apply {
+                setOnRegionSelectedListener { rect ->
+                    dismissRegionSelector()
+                    onRegionSelected(rect)
+                }
+                onCancelListener = {
+                    dismissRegionSelector()
+                    onCancel()
+                }
+                startAutoDismissTimer(scope)
+            }
+
+        val added = safeAddView(selectorView, selectorParams)
+        if (added) {
+            regionSelectorView = selectorView
+            Timber.d("RegionSelectorView đính kèm thành công lên WindowManager")
+        } else {
+            Timber.e("OverlayWindowManager: Không thể gắn RegionSelectorView")
+        }
+        return added
+    }
+
+    override fun dismissRegionSelector() {
+        regionSelectorView?.cancelAutoDismiss()
+        safeRemoveView(regionSelectorView)
+        regionSelectorView = null
     }
 
     @Suppress("TooGenericExceptionCaught")
