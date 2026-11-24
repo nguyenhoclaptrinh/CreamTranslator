@@ -116,11 +116,16 @@ class RegionSelectorView
             }
         }
 
+        private fun clampX(x: Float): Float = if (width > 0) x.coerceIn(0f, width.toFloat()) else x.coerceAtLeast(0f)
+
+        private fun clampY(y: Float): Float = if (height > 0) y.coerceIn(0f, height.toFloat()) else y.coerceAtLeast(0f)
+
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    startX = event.x
-                    startY = event.y
+                    cancelAutoDismiss()
+                    startX = clampX(event.x)
+                    startY = clampY(event.y)
                     currentX = startX
                     currentY = startY
                     isSelecting = true
@@ -128,8 +133,8 @@ class RegionSelectorView
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    currentX = event.x
-                    currentY = event.y
+                    currentX = clampX(event.x)
+                    currentY = clampY(event.y)
                     invalidate()
                     return true
                 }

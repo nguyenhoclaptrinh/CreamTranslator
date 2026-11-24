@@ -189,6 +189,7 @@ class FloatingTriggerController(
                         Math.abs(dy) > OverlayConfig.TRIGGER_DRAG_THRESHOLD
                     ) {
                         isClick = false
+                        lastTapUpTimeMs = -1L
                         longPressJob?.cancel()
                         pendingSingleTapJob?.cancel()
                     }
@@ -223,6 +224,7 @@ class FloatingTriggerController(
                                     delay(doubleTapWindowMs + 20)
                                     // Nếu lastTapUpTimeMs vẫn là capturedTime → không có double-tap
                                     if (lastTapUpTimeMs == capturedTime) {
+                                        lastTapUpTimeMs = -1L
                                         onClick()
                                     }
                                 }
@@ -235,6 +237,7 @@ class FloatingTriggerController(
                 MotionEvent.ACTION_CANCEL -> {
                     longPressJob?.cancel()
                     pendingSingleTapJob?.cancel()
+                    lastTapUpTimeMs = -1L
                     if (!isClick) {
                         animateSnapToEdge(view, params)
                     }

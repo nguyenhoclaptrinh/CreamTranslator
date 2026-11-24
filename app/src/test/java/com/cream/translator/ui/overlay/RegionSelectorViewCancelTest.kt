@@ -78,4 +78,42 @@ class RegionSelectorViewCancelTest : BaseRobolectricTest() {
             runCurrent()
             assertTrue(cancelled)
         }
+
+    @Test
+    fun activeDrag_cancelsAutoDismissTimer_andCompletesSelectionAfterTimeout() =
+        runTest(testDispatcher) {
+            val view = RegionSelectorView(context)
+            var selectedRect: Rect? = null
+            var cancelled = false
+            view.setOnRegionSelectedListener { selectedRect = it }
+            view.onCancelListener = { cancelled = true }
+
+            view.startAutoDismissTimer(this)
+            advanceTimeBy(9_000L)
+            runCurrent()
+
+            dispatchTouch(view, MotionEvent.ACTION_DOWN, 50f, 60f)
+            advanceTimeBy(2_000L)
+            runCurrent()
+            assertFalse(cancelled)
+
+            dispatchTouch(view, MotionEvent.ACTION_MOVE, 250f, 300f)
+            dispatchTouch(view, MotionEvent.ACTION_UP, 250f, 300f)
+            assertEquals(Rect(50, 60, 250, 300), selectedRect)
+            assertFalse(cancelled)
+        }
+
+    @Test
+    fun outOfBoundsDrag_clampsSelectionRectToViewBounds() {
+        val view = RegionSelectorView(context)
+        view.layout(0, 0, 1080, 1920)
+        var selectedRect: Rect? = null
+        view.setOnRegionSelectedListener { selectedRect = it }
+
+        dispatchTouch(view, MotionEvent.ACTION_DOWN, -30f, -20f)
+        dispatchTouch(view, MotionEvent.ACTION_MOVE, 1200f, 2000f)
+        dispatchTouch(view, MotionEvent.ACTION_UP, 1200f, 2000f)
+
+        assertEquals(Rect(0, 0, 1080, 1920), selectedRect)
+    }
 }

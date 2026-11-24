@@ -128,7 +128,7 @@ class RegionTranslateController(
                     return@launch
                 }
 
-                val offset = PixelOffset(region.left, region.top)
+                val offset = PixelOffset(region.left.coerceAtLeast(0), region.top.coerceAtLeast(0))
                 val results =
                     pipelineCoordinator.executePipeline(
                         croppedBitmap,
