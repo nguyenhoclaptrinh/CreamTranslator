@@ -12,7 +12,7 @@
 ## Enterprise DevOps & Quality Assurance
 - **Continuous Integration:** GitHub Actions (`.github/workflows/ci.yml`) runs Spotless, Ktlint, Detekt static analysis, and automated unit test suites on every push and pull request.
 - **Git Hooks:** Pre-commit hooks (`.githooks/pre-commit`) ensure zero-defect code commits.
-- **Architecture Documentation:** Formal Architecture Decision Records (ADRs) available in `docs/adr/`.
+- **Architecture & Product Strategy:** Formal Architecture Decision Records (ADRs) available in `docs/adr/`, and Competitive Benchmarking & Roadmap in [docs/FEATURE_MAP.md](docs/FEATURE_MAP.md).
 
 ## Setup & Building
 ```bash
