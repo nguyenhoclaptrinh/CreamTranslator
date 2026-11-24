@@ -124,4 +124,43 @@ class TextInpainterTest {
         // Right bound must not expand beyond targetBox.right + 8f (208f)
         assertTrue(bounds.right <= 208.01f)
     }
+
+    @Test
+    fun boxCoordinates_offset_shiftsCoordinatesAccurately() {
+        val originalBox = TextInpainter.BoxCoordinates(100f, 200f, 300f, 250f)
+        val shifted = originalBox.offset(-88f, -24f)
+
+        assertEquals(12f, shifted.left, 0.001f)
+        assertEquals(176f, shifted.top, 0.001f)
+        assertEquals(212f, shifted.right, 0.001f)
+        assertEquals(226f, shifted.bottom, 0.001f)
+        assertEquals(originalBox.width, shifted.width, 0.001f)
+        assertEquals(originalBox.height, shifted.height, 0.001f)
+    }
+
+    @Test
+    fun computePlateBounds_withLandscapeCutoutOffset_preservesScreenPosition() {
+        val physicalBox = TextInpainter.BoxCoordinates(500f, 100f, 700f, 140f)
+        val cutoutOffsetX = 88f
+        val cutoutOffsetY = 0f
+
+        val localBox = physicalBox.offset(-cutoutOffsetX, -cutoutOffsetY)
+        assertEquals(412f, localBox.left, 0.001f)
+        assertEquals(612f, localBox.right, 0.001f)
+
+        val localBounds =
+            TextInpainter.computePlateBounds(
+                box = localBox,
+                textSize = Pair(180f, 30f),
+                padding = Pair(10f, 5f),
+                screenSize = Pair(2400f - cutoutOffsetX, 1080f),
+            )
+
+        // Mapping local plate back to physical coordinates produces exact alignment
+        val physicalPlateLeft = localBounds.left + cutoutOffsetX
+        val physicalPlateRight = localBounds.right + cutoutOffsetX
+        val physicalPlateCenterX = (physicalPlateLeft + physicalPlateRight) / 2f
+
+        assertEquals(physicalBox.centerX, physicalPlateCenterX, 0.001f)
+    }
 }

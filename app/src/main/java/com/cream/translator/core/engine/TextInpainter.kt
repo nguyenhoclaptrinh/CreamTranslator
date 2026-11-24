@@ -134,6 +134,11 @@ object TextInpainter {
         val height: Float get() = max(0f, bottom - top)
         val centerX: Float get() = left + width / 2f
         val centerY: Float get() = top + height / 2f
+
+        fun offset(
+            dx: Float,
+            dy: Float,
+        ): BoxCoordinates = BoxCoordinates(left + dx, top + dy, right + dx, bottom + dy)
     }
 
     data class ExpansionConstraints(

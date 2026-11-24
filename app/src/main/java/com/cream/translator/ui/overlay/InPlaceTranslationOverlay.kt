@@ -25,6 +25,7 @@ class InPlaceTranslationOverlay
         private val results = mutableListOf<TranslationResult>()
         private val toggledRegions = mutableSetOf<String>()
         private val renderedPlates = mutableMapOf<String, RectF>()
+        private val windowLocationOnScreen = IntArray(2)
         var onDismissListener: (() -> Unit)? = null
 
         private val bgPaint =
@@ -67,14 +68,19 @@ class InPlaceTranslationOverlay
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            getLocationOnScreen(windowLocationOnScreen)
+            val windowOffsetX = windowLocationOnScreen[0].toFloat()
+            val windowOffsetY = windowLocationOnScreen[1].toFloat()
             for (item in results) {
-                drawTranslationItem(canvas, item)
+                drawTranslationItem(canvas, item, windowOffsetX, windowOffsetY)
             }
         }
 
         private fun drawTranslationItem(
             canvas: Canvas,
             item: TranslationResult,
+            windowOffsetX: Float,
+            windowOffsetY: Float,
         ) {
             val rect = item.region.boundingBox
             val density = resources.displayMetrics.density
@@ -93,15 +99,16 @@ class InPlaceTranslationOverlay
                     ?: TextInpainter.calculateContrastingTextColor(bgColor)
             textPaint.color = textColor
 
+            // Map physical screen coordinates to local view canvas space
             val targetBox =
                 TextInpainter.BoxCoordinates(
                     rect.left.toFloat(),
                     rect.top.toFloat(),
                     rect.right.toFloat(),
                     rect.bottom.toFloat(),
-                )
+                ).offset(-windowOffsetX, -windowOffsetY)
 
-            // Gather other bounding boxes to calculate collision-free expansion limits
+            // Gather other bounding boxes mapped to local view coordinates
             val otherBoxes =
                 results.mapNotNull { other ->
                     if (other.region.id != item.region.id) {
@@ -111,7 +118,7 @@ class InPlaceTranslationOverlay
                             ob.top.toFloat(),
                             ob.right.toFloat(),
                             ob.bottom.toFloat(),
-                        )
+                        ).offset(-windowOffsetX, -windowOffsetY)
                     } else {
                         null
                     }
@@ -177,9 +184,9 @@ class InPlaceTranslationOverlay
 
             // Center static layout vertically and horizontally inside the adaptive plate
             canvas.save()
-            val offsetX = plateRectF.centerX() - staticLayout.width / 2f
-            val offsetY = plateRectF.centerY() - staticLayout.height / 2f
-            canvas.translate(offsetX, offsetY)
+            val textOffsetX = plateRectF.centerX() - staticLayout.width / 2f
+            val textOffsetY = plateRectF.centerY() - staticLayout.height / 2f
+            canvas.translate(textOffsetX, textOffsetY)
             staticLayout.draw(canvas)
             canvas.restore()
         }
@@ -215,7 +222,15 @@ class InPlaceTranslationOverlay
 
                     for (item in results) {
                         val plate = renderedPlates[item.region.id]
-                        val isHit = plate?.contains(event.x, event.y) ?: item.region.boundingBox.contains(x, y)
+                        val bb = item.region.boundingBox
+                        val offsetX = windowLocationOnScreen[0]
+                        val offsetY = windowLocationOnScreen[1]
+                        val isHit =
+                            plate?.contains(event.x, event.y)
+                                ?: (
+                                    x in (bb.left - offsetX)..(bb.right - offsetX) &&
+                                        y in (bb.top - offsetY)..(bb.bottom - offsetY)
+                                )
                         if (isHit) {
                             // Toggle between original text and translated text
                             if (toggledRegions.contains(item.region.id)) {
