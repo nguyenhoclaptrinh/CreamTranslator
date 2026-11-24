@@ -1,0 +1,242 @@
+package com.cream.translator.ui.overlay
+
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
+import android.provider.Settings
+import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import android.widget.ImageView
+import com.cream.translator.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import timber.log.Timber
+
+/**
+ * Điều khiển giao diện bong bóng nổi, cử chỉ chạm/kéo và animation hít mép màn hình.
+ */
+class FloatingTriggerController(
+    private val context: Context,
+    private val windowManager: IOverlayWindowManager,
+    private val coroutineScope: CoroutineScope,
+) {
+    var floatingTriggerView: View? = null
+        private set
+
+    var triggerParams: WindowManager.LayoutParams? = null
+        private set
+
+    private var snapAnimator: ValueAnimator? = null
+
+    val isVisible: Boolean
+        get() = floatingTriggerView?.visibility == View.VISIBLE
+
+    fun setVisibility(visible: Boolean) {
+        floatingTriggerView?.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    fun setupFloatingTrigger(
+        onClick: () -> Unit,
+        onLongPress: () -> Unit,
+    ): Boolean {
+        if (!Settings.canDrawOverlays(context)) {
+            Timber.w("FloatingTriggerController: Quyền vẽ đè (Overlay) chưa được cấp")
+            return false
+        }
+
+        val layoutType =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
+        val density = context.resources.displayMetrics.density
+        val size = (OverlayConfig.TRIGGER_SIZE_DP * density).toInt()
+
+        val params =
+            WindowManager.LayoutParams(
+                size,
+                size,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = OverlayConfig.TRIGGER_DEFAULT_X
+                y = OverlayConfig.TRIGGER_DEFAULT_Y
+            }
+        triggerParams = params
+
+        val triggerButton =
+            ImageView(context).apply {
+                setImageResource(R.drawable.ic_notification_capture)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val pad = (11 * density).toInt()
+                setPadding(pad, pad, pad, pad)
+
+                val bg =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#E11D48"))
+                        setStroke((2 * density).toInt(), Color.WHITE)
+                    }
+                background = bg
+                elevation = 14f
+            }
+
+        attachDragAndClickListener(triggerButton, params, onClick, onLongPress)
+
+        val attached = windowManager.safeAddView(triggerButton, params)
+        return if (attached) {
+            floatingTriggerView = triggerButton
+            Timber.d("Floating trigger attached successfully")
+            true
+        } else {
+            Timber.e("Failed to attach floating overlay view")
+            false
+        }
+    }
+
+    private fun animateSnapToEdge(
+        view: View,
+        params: WindowManager.LayoutParams,
+    ) {
+        val screenWidth = windowManager.getScreenWidth()
+        val screenHeight = windowManager.getScreenHeight()
+        val density = context.resources.displayMetrics.density
+        val size = (52 * density).toInt()
+        val margin = (12 * density).toInt()
+
+        val safeMaxY = (screenHeight - size - margin).coerceAtLeast(margin)
+        params.y = params.y.coerceIn(margin, safeMaxY)
+
+        val isLeft = (params.x + size / 2) < (screenWidth / 2)
+        val targetX = if (isLeft) margin else (screenWidth - size - margin)
+
+        snapAnimator?.cancel()
+        snapAnimator =
+            ValueAnimator.ofInt(params.x, targetX).apply {
+                duration = 250
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { animation ->
+                    if (floatingTriggerView != null && (view.isAttachedToWindow || view.windowToken != null)) {
+                        params.x = animation.animatedValue as Int
+                        windowManager.safeUpdateViewLayout(view, params)
+                    }
+                }
+                start()
+            }
+    }
+
+    private fun attachDragAndClickListener(
+        view: View,
+        params: WindowManager.LayoutParams,
+        onClick: () -> Unit,
+        onLongPress: () -> Unit,
+    ) {
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+        var isClick = true
+        var longPressJob: Job? = null
+
+        view.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    snapAnimator?.cancel()
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    isClick = true
+
+                    longPressJob =
+                        coroutineScope.launch {
+                            delay(800)
+                            if (isClick) {
+                                isClick = false
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                onLongPress()
+                            }
+                        }
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (event.rawX - initialTouchX).toInt()
+                    val dy = (event.rawY - initialTouchY).toInt()
+                    if (Math.abs(dx) > OverlayConfig.TRIGGER_DRAG_THRESHOLD ||
+                        Math.abs(dy) > OverlayConfig.TRIGGER_DRAG_THRESHOLD
+                    ) {
+                        isClick = false
+                        longPressJob?.cancel()
+                    }
+                    val screenWidth = windowManager.getScreenWidth()
+                    val screenHeight = windowManager.getScreenHeight()
+                    val density = context.resources.displayMetrics.density
+                    val size = (52 * density).toInt()
+                    val margin = (12 * density).toInt()
+
+                    params.x = (initialX + dx).coerceIn(-margin, screenWidth - size + margin)
+                    val safeMaxY = (screenHeight - size - margin).coerceAtLeast(margin)
+                    params.y = (initialY + dy).coerceIn(margin, safeMaxY)
+                    windowManager.safeUpdateViewLayout(view, params)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    longPressJob?.cancel()
+                    if (isClick) {
+                        onClick()
+                    } else {
+                        animateSnapToEdge(view, params)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    longPressJob?.cancel()
+                    if (!isClick) {
+                        animateSnapToEdge(view, params)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    fun handleConfigurationChange() {
+        floatingTriggerView?.let { trigger ->
+            triggerParams?.let { params ->
+                val displayMetrics = context.resources.displayMetrics
+                val maxX = displayMetrics.widthPixels - params.width
+                val maxY = displayMetrics.heightPixels - params.height
+                params.x = params.x.coerceIn(0, maxOf(0, maxX))
+                params.y = params.y.coerceIn(0, maxOf(0, maxY))
+                windowManager.safeUpdateViewLayout(trigger, params)
+            }
+        }
+    }
+
+    fun destroy() {
+        snapAnimator?.cancel()
+        snapAnimator = null
+        if (floatingTriggerView != null) {
+            windowManager.safeRemoveView(floatingTriggerView)
+            floatingTriggerView = null
+        }
+    }
+}
