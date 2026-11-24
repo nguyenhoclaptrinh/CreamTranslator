@@ -76,6 +76,7 @@ class MlKitTranslationEngine : TranslationEngine {
                 }
         }
 
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun translateBatch(
         texts: List<String>,
         languagePair: LanguagePair,
@@ -87,7 +88,7 @@ class MlKitTranslationEngine : TranslationEngine {
                         translate(text, languagePair)
                     } catch (cancellation: CancellationException) {
                         throw cancellation
-                    } catch (e: Throwable) {
+                    } catch (e: Exception) {
                         Timber.w(e, "Fallback to original text due to translation error")
                         text
                     }
@@ -99,8 +100,10 @@ class MlKitTranslationEngine : TranslationEngine {
         translators.values.forEach { translator ->
             try {
                 translator.close()
-            } catch (e: Exception) {
+            } catch (e: java.io.IOException) {
                 Timber.e(e, "Error closing translator")
+            } catch (e: IllegalStateException) {
+                Timber.e(e, "Illegal state closing translator")
             }
         }
         translators.clear()

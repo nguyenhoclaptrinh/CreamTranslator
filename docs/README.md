@@ -34,6 +34,7 @@ Các bản ADR ghi nhận các quyết định công nghệ và ranh giới bấ
 | **[ADR-003](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-003-inplace-inpainting-and-overlay.md)** | In-Place Inpainting and Overlay Rendering Architecture | `Accepted` | Render chữ đè trực tiếp lên màn hình tại đúng toạ độ bounding box với mẫu màu nền tương phản tự động (TextInpainter) và StaticLayout. |
 | **[ADR-004](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-004-local-first-monitoring-and-diagnostic-logging.md)** | Local-First Monitoring, Diagnostic Logging, and Pipeline Tracing Architecture | `Accepted` | Xây dựng hệ thống giám sát và đệm log cục bộ 100%, bảo vệ dữ liệu nhạy cảm qua LogSanitizer, đệm vòng in-memory, xoay vòng file đĩa tối đa 2MB và đo đạc độ trễ Pipeline. |
 | **[ADR-005](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-005-ai-agent-optimized-architecture.md)** | AI-Agent-Optimized Layered Architecture and Testing Harness | `Accepted` | Tái cấu trúc Layered Interface-First cho OverlayService, tích hợp Robolectric trên JVM và module hóa tài liệu hướng dẫn Agent. |
+| **[ADR-006](file:///d:/Workspaces/Tools/CreamTranslator/docs/adr/ADR-006-harness-engineering-and-ratchet-architecture.md)** | Mechanical Harness Engineering, Architectural Ratchet, and Property-Based Testing Architecture | `Accepted` | Thắt chặt Detekt rules, thiết lập rào chắn kiến trúc tự động bằng Konsist, State Machine vòng đời chụp màn hình và Property-Based Fuzzing với Kotest. |
 
 ---
 

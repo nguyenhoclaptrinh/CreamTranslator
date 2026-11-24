@@ -53,44 +53,7 @@ class UpdateEngine(
                 }
 
                 val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(responseBody)
-
-                val tagName = json.getString("tag_name")
-                val releaseNotes = json.optString("body", "Không có ghi chú phát hành.")
-                val remoteVersion = tagName.removePrefix("v").removePrefix("V")
-
-                val assets = json.getJSONArray("assets")
-                var apkDownloadUrl: String? = null
-                var apkSize: Long = 0L
-
-                for (i in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(i)
-                    val name = asset.getString("name")
-                    if (name.endsWith(".apk", ignoreCase = true)) {
-                        apkDownloadUrl = asset.getString("browser_download_url")
-                        apkSize = asset.optLong("size", 0L)
-                        break
-                    }
-                }
-
-                if (apkDownloadUrl == null) {
-                    Timber.w("No APK asset found in release %s", tagName)
-                    return@withContext Result.success(null)
-                }
-
-                if (isNewerVersion(remoteVersion, currentVersionName)) {
-                    val info =
-                        AppReleaseInfo(
-                            tagName = tagName,
-                            versionName = remoteVersion,
-                            releaseNotes = releaseNotes,
-                            downloadUrl = apkDownloadUrl,
-                            apkSize = apkSize,
-                        )
-                    Result.success(info)
-                } else {
-                    Result.success(null)
-                }
+                Result.success(parseReleaseJson(responseBody, currentVersionName))
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (e: UnknownHostException) {
@@ -99,11 +62,55 @@ class UpdateEngine(
             } catch (e: SocketTimeoutException) {
                 Timber.e(e, "Connection timeout when checking for updates")
                 Result.failure(IllegalStateException("Hết thời gian kết nối tới máy chủ cập nhật"))
-            } catch (e: Throwable) {
-                Timber.e(e, "Error checking for updates")
+            } catch (e: java.io.IOException) {
+                Timber.e(e, "I/O error checking for updates")
+                Result.failure(e)
+            } catch (e: SecurityException) {
+                Timber.e(e, "Security error checking for updates")
                 Result.failure(e)
             }
         }
+
+    private fun parseReleaseJson(
+        responseBody: String,
+        currentVersionName: String,
+    ): AppReleaseInfo? {
+        val json = JSONObject(responseBody)
+        val tagName = json.getString("tag_name")
+        val releaseNotes = json.optString("body", "Không có ghi chú phát hành.")
+        val remoteVersion = tagName.removePrefix("v").removePrefix("V")
+
+        val assets = json.getJSONArray("assets")
+        var apkDownloadUrl: String? = null
+        var apkSize: Long = 0L
+
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.getString("name")
+            if (name.endsWith(".apk", ignoreCase = true)) {
+                apkDownloadUrl = asset.getString("browser_download_url")
+                apkSize = asset.optLong("size", 0L)
+                break
+            }
+        }
+
+        if (apkDownloadUrl == null) {
+            Timber.w("No APK asset found in release %s", tagName)
+            return null
+        }
+
+        return if (isNewerVersion(remoteVersion, currentVersionName)) {
+            AppReleaseInfo(
+                tagName = tagName,
+                versionName = remoteVersion,
+                releaseNotes = releaseNotes,
+                downloadUrl = apkDownloadUrl,
+                apkSize = apkSize,
+            )
+        } else {
+            null
+        }
+    }
 
     fun downloadApk(
         downloadUrl: String,
@@ -159,9 +166,12 @@ class UpdateEngine(
                 emit(DownloadState.Completed(destinationFile))
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (e: Throwable) {
-                Timber.e(e, "Exception during APK download")
+            } catch (e: java.io.IOException) {
+                Timber.e(e, "I/O exception during APK download")
                 emit(DownloadState.Error(e.message ?: "Lỗi tải tệp cài đặt"))
+            } catch (e: SecurityException) {
+                Timber.e(e, "Security exception during APK download")
+                emit(DownloadState.Error(e.message ?: "Không có quyền lưu tệp cài đặt"))
             } finally {
                 if (tempFile.exists()) {
                     tempFile.delete()

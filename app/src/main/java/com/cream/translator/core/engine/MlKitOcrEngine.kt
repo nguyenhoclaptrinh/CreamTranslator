@@ -62,7 +62,7 @@ class MlKitOcrEngine : OcrEngine {
     override fun close() {
         try {
             recognizer.close()
-        } catch (e: Exception) {
+        } catch (e: java.io.IOException) {
             Timber.e(e, "Error closing ML Kit recognizer")
         }
     }

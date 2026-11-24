@@ -16,9 +16,17 @@ complexity:
 
 exceptions:
   TooGenericExceptionCaught:
-    active: false
+    active: true
 
 style:
+  ForbiddenComment:
+    active: true
+    comments:
+      - 'TODO:'
+      - 'FIXME:'
+      - 'STOPSHIP:'
+      - 'HACK:'
+      - 'TEMP:'
   MagicNumber:
     active: false
   ReturnCount:

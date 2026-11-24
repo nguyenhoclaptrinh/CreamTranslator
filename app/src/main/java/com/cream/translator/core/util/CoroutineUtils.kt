@@ -9,6 +9,7 @@ import timber.log.Timber
  * If [block] throws a [CancellationException], it is immediately rethrown to preserve
  * structured concurrency in Kotlin coroutines.
  */
+@Suppress("TooGenericExceptionCaught")
 inline fun <T> runSuspendCatching(block: () -> T): Result<T> =
     try {
         Result.success(block())

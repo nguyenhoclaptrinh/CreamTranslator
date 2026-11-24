@@ -110,6 +110,7 @@ class OverlayWindowManager(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun safeAddView(
         view: View,
         params: ViewGroup.LayoutParams,
@@ -122,6 +123,7 @@ class OverlayWindowManager(
             false
         }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun safeRemoveView(view: View?): Boolean =
         try {
             if (view != null && (view.isAttachedToWindow || view.windowToken != null || view.parent != null)) {
@@ -135,6 +137,7 @@ class OverlayWindowManager(
             false
         }
 
+    @Suppress("TooGenericExceptionCaught")
     override fun safeUpdateViewLayout(
         view: View,
         params: ViewGroup.LayoutParams,
