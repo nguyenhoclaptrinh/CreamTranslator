@@ -9,11 +9,15 @@ Chào mừng bạn đến với trung tâm lưu trữ tri thức kỹ thuật v�
 ```
 docs/
 ├── README.md               # Mục lục tri thức và hướng dẫn chung (tệp này)
+├── FEATURE_MAP.md          # Bản đồ tính năng và ma trận đối sánh cạnh tranh
 ├── THREAT_MODEL.md         # Mô hình đe dọa bảo mật và cam kết Anti-Cheat
 ├── adr/                    # Architecture Decision Records (Quyết định kiến trúc đã chốt)
 │   ├── ADR-001-on-device-mlkit-pipeline.md
 │   ├── ADR-002-zero-accessibility-architecture.md
-│   └── ADR-003-inplace-inpainting-and-overlay.md
+│   ├── ADR-003-inplace-inpainting-and-overlay.md
+│   ├── ADR-004-local-first-monitoring-and-diagnostic-logging.md
+│   ├── ADR-005-ai-agent-optimized-architecture.md
+│   └── ADR-006-harness-engineering-and-ratchet-architecture.md
 ├── proposals/              # Requests for Comments / Proposals (Đề xuất tính năng tương lai)
 │   └── RFC-001-floating-quick-action-menu.md
 └── templates/              # Biểu mẫu tài liệu chuẩn hóa
@@ -23,7 +27,18 @@ docs/
 
 ---
 
-## 2. Danh mục Quyết định Kiến trúc (Architecture Decision Records - ADR)
+## 2. Bản đồ Tính năng & Đối sánh Năng lực Cạnh tranh (Feature Map & Benchmarking)
+
+Xem chi tiết tại: **[FEATURE_MAP.md](file:///d:/Workspaces/Tools/CreamTranslator/docs/FEATURE_MAP.md)**
+
+Tài liệu này cung cấp:
+- Ma trận đối sánh năng lực kỹ thuật giữa CreamTranslator và 5 ứng dụng dịch màn hình phổ biến nhất trên Android (Tap To Translate, Ever Translator, Bubble Screen Translate, Kaku, Instant Translate).
+- Phân tích ranh giới lợi thế cạnh tranh cốt lõi (Core Moats): 100% On-Device, miễn nhiễm Anti-Cheat hoàn toàn, thay thế văn bản trực tiếp inpainting, kiến trúc kiểm thử chuẩn công nghiệp.
+- Bản đồ tính năng 4 tầng theo chu kỳ phát hành từ v1.0 đến v2.5+.
+
+---
+
+## 3. Danh mục Quyết định Kiến trúc (Architecture Decision Records - ADR)
 
 Các bản ADR ghi nhận các quyết định công nghệ và ranh giới bất biến đã được áp dụng vào codebase:
 
@@ -38,7 +53,7 @@ Các bản ADR ghi nhận các quyết định công nghệ và ranh giới bấ
 
 ---
 
-## 3. Danh mục Đề xuất Tính năng (Requests for Comments - RFC)
+## 4. Danh mục Đề xuất Tính năng (Requests for Comments - RFC)
 
 Các bản RFC đặc tả các ý tưởng, cải tiến trải nghiệm người dùng hoặc tính năng mới được thảo luận nhưng chưa triển khai ngay:
 
@@ -48,7 +63,7 @@ Các bản RFC đặc tả các ý tưởng, cải tiến trải nghiệm ngư�
 
 ---
 
-## 4. Hướng dẫn Đóng góp Tài liệu (Contribution Guide)
+## 5. Hướng dẫn Đóng góp Tài liệu (Contribution Guide)
 
 Mọi lập trình viên và AI Agent khi hoạt động trong dự án đều phải tuân thủ nghiêm ngặt nguyên tắc:
 1. **Khi phát sinh ý tưởng/tính năng mới chưa làm ngay**: Bắt buộc tạo bản RFC trong `docs/proposals/` theo mẫu [TEMPLATE_RFC.md](file:///d:/Workspaces/Tools/CreamTranslator/docs/templates/TEMPLATE_RFC.md).
