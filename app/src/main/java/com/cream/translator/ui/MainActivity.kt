@@ -176,6 +176,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkPermissions()
+    }
+
     private fun triggerApkInstall(apkFile: File) {
         if (!UpdateInstaller.canRequestPackageInstalls(this)) {
             Toast.makeText(
@@ -238,13 +243,18 @@ fun TranslatorDashboard(
     var selectedPair by remember { mutableStateOf(supportedPairs.first()) }
     var isModelReady by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
+    var activeDownloadPair by remember { mutableStateOf(selectedPair) }
 
     LaunchedEffect(selectedPair) {
+        val requestedPair = selectedPair
+        activeDownloadPair = requestedPair
         isDownloading = true
         isModelReady = false
-        actions.onDownloadModel(selectedPair) { success ->
-            isModelReady = success
-            isDownloading = false
+        actions.onDownloadModel(requestedPair) { success ->
+            if (activeDownloadPair == requestedPair) {
+                isModelReady = success
+                isDownloading = false
+            }
         }
     }
 
@@ -286,10 +296,14 @@ fun TranslatorDashboard(
             selectedPair = selectedPair,
             actions = actions,
             onTriggerModelDownload = {
+                val requestedPair = selectedPair
+                activeDownloadPair = requestedPair
                 isDownloading = true
-                actions.onDownloadModel(selectedPair) { success ->
-                    isModelReady = success
-                    isDownloading = false
+                actions.onDownloadModel(requestedPair) { success ->
+                    if (activeDownloadPair == requestedPair) {
+                        isModelReady = success
+                        isDownloading = false
+                    }
                 }
             },
         )

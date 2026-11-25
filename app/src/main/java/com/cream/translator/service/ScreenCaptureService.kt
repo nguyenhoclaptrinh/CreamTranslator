@@ -45,6 +45,7 @@ class ScreenCaptureService : Service() {
     ): Int {
         if (intent?.action == ACTION_STOP) {
             Timber.i("ScreenCaptureService nhận lệnh ACTION_STOP")
+            TranslatorController.stop(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -59,23 +60,79 @@ class ScreenCaptureService : Service() {
             }
 
         if (resultCode != 0 && resultData != null) {
-            startForegroundWithNotification()
-            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
-            mediaProjection?.let { projection ->
-                captureManager =
-                    ScreenCaptureManager(this, projection).apply {
-                        onStopCallback = {
-                            Timber.i("MediaProjection đã bị thu hồi/dừng từ hệ thống")
-                            TranslatorController.stop(this@ScreenCaptureService)
-                        }
-                    }
-                TranslatorController.updateServiceState(true)
-                Timber.d("MediaProjection initialized in ScreenCaptureService")
-            }
+            initializeCaptureSession(resultCode, resultData)
+        } else if (captureManager == null) {
+            Timber.w("ScreenCaptureService nhận lệnh khởi chạy không có MediaProjection token hợp lệ")
+            TranslatorController.stop(this)
+            stopSelf()
         }
 
         return START_NOT_STICKY
+    }
+
+    private fun initializeCaptureSession(
+        resultCode: Int,
+        resultData: Intent,
+    ) {
+        releaseCaptureResources()
+        try {
+            startForegroundWithNotification()
+            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val projection = projectionManager.getMediaProjection(resultCode, resultData)
+            if (projection == null) {
+                Timber.e("getMediaProjection trả về null")
+                abortCaptureSession()
+                return
+            }
+            mediaProjection = projection
+            val manager =
+                ScreenCaptureManager(this, projection).apply {
+                    onStopCallback = {
+                        Timber.i("MediaProjection đã bị thu hồi/dừng từ hệ thống")
+                        TranslatorController.stop(this@ScreenCaptureService)
+                    }
+                }
+            if (!manager.isProjectionActive) {
+                Timber.e("Khởi tạo ScreenCaptureManager thất bại")
+                manager.release()
+                abortCaptureSession()
+                return
+            }
+            captureManager = manager
+            TranslatorController.updateServiceState(true)
+            Timber.d("MediaProjection initialized in ScreenCaptureService")
+        } catch (e: SecurityException) {
+            Timber.e(e, "SecurityException khi khởi tạo ScreenCaptureService")
+            abortCaptureSession()
+        } catch (e: IllegalStateException) {
+            Timber.e(e, "IllegalStateException khi khởi tạo ScreenCaptureService")
+            abortCaptureSession()
+        } catch (e: IllegalArgumentException) {
+            Timber.e(e, "IllegalArgumentException khi khởi tạo ScreenCaptureService")
+            abortCaptureSession()
+        }
+    }
+
+    private fun abortCaptureSession() {
+        releaseCaptureResources()
+        TranslatorController.stop(this)
+        stopSelf()
+    }
+
+    private fun releaseCaptureResources() {
+        captureManager?.onStopCallback = null
+        captureManager?.release()
+        captureManager = null
+        mediaProjection?.let { projection ->
+            try {
+                projection.stop()
+            } catch (e: IllegalStateException) {
+                Timber.w(e, "IllegalStateException khi dừng MediaProjection")
+            } catch (e: SecurityException) {
+                Timber.w(e, "SecurityException khi dừng MediaProjection")
+            }
+        }
+        mediaProjection = null
     }
 
     private fun startForegroundWithNotification() {
@@ -149,6 +206,10 @@ class ScreenCaptureService : Service() {
      */
     suspend fun captureRegion(region: Rect): Bitmap? {
         val full = captureCurrentScreen() ?: return null
+        if (full.width <= 0 || full.height <= 0) {
+            full.recycle()
+            return null
+        }
         return try {
             val safeLeft = region.left.coerceIn(0, full.width - 1)
             val safeTop = region.top.coerceIn(0, full.height - 1)
@@ -181,12 +242,17 @@ class ScreenCaptureService : Service() {
 
     override fun onDestroy() {
         instance = null
-        captureManager?.onStopCallback = null
-        captureManager?.release()
-        captureManager = null
-        mediaProjection?.stop()
-        mediaProjection = null
+        releaseCaptureResources()
         TranslatorController.updateServiceState(false)
+        if (OverlayService.isRunning) {
+            try {
+                stopService(Intent(this, OverlayService::class.java))
+            } catch (e: SecurityException) {
+                Timber.w(e, "SecurityException khi dừng OverlayService từ ScreenCaptureService.onDestroy")
+            } catch (e: IllegalStateException) {
+                Timber.w(e, "IllegalStateException khi dừng OverlayService từ ScreenCaptureService.onDestroy")
+            }
+        }
         super.onDestroy()
         Timber.d("ScreenCaptureService destroyed")
     }

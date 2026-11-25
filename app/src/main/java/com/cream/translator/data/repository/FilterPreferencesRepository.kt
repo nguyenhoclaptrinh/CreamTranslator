@@ -15,60 +15,74 @@ class FilterPreferencesRepository(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    private val configLock = Any()
+
     private val _configFlow = MutableStateFlow(loadConfig())
     val configFlow: StateFlow<FilterConfig> = _configFlow.asStateFlow()
 
     fun getConfig(): FilterConfig = _configFlow.value
 
     fun setFilteringEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_IS_FILTERING_ENABLED, enabled).apply()
-        _configFlow.value = _configFlow.value.copy(isFilteringEnabled = enabled)
+        synchronized(configLock) {
+            prefs.edit().putBoolean(KEY_IS_FILTERING_ENABLED, enabled).apply()
+            _configFlow.value = _configFlow.value.copy(isFilteringEnabled = enabled)
+        }
     }
 
     fun setUiControlsEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_IS_UI_CONTROLS_ENABLED, enabled).apply()
-        _configFlow.value = _configFlow.value.copy(isUiControlsEnabled = enabled)
+        synchronized(configLock) {
+            prefs.edit().putBoolean(KEY_IS_UI_CONTROLS_ENABLED, enabled).apply()
+            _configFlow.value = _configFlow.value.copy(isUiControlsEnabled = enabled)
+        }
     }
 
     fun setSymbolsAndNumbersEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_IS_SYMBOLS_AND_NUMBERS_ENABLED, enabled).apply()
-        _configFlow.value = _configFlow.value.copy(isSymbolsAndNumbersEnabled = enabled)
+        synchronized(configLock) {
+            prefs.edit().putBoolean(KEY_IS_SYMBOLS_AND_NUMBERS_ENABLED, enabled).apply()
+            _configFlow.value = _configFlow.value.copy(isSymbolsAndNumbersEnabled = enabled)
+        }
     }
 
     fun addCustomWord(word: String): Boolean {
         val trimmed = word.trim()
         if (trimmed.isEmpty()) return false
 
-        val currentWords = _configFlow.value.customBlockedWords.toMutableSet()
-        val normalized = trimmed.lowercase(Locale.ROOT)
-        // Kiểm tra xem đã tồn tại (không phân biệt chữ hoa/thường) chưa
-        val alreadyExists = currentWords.any { it.equals(normalized, ignoreCase = true) }
-        if (alreadyExists) return false
+        synchronized(configLock) {
+            val currentWords = _configFlow.value.customBlockedWords.toMutableSet()
+            val normalized = trimmed.lowercase(Locale.ROOT)
+            // Kiểm tra xem đã tồn tại (không phân biệt chữ hoa/thường) chưa
+            val alreadyExists = currentWords.any { it.equals(normalized, ignoreCase = true) }
+            if (alreadyExists) return false
 
-        currentWords.add(trimmed)
-        prefs.edit().putStringSet(KEY_CUSTOM_BLOCKED_WORDS, currentWords).apply()
-        _configFlow.value = _configFlow.value.copy(customBlockedWords = currentWords)
-        return true
+            currentWords.add(trimmed)
+            prefs.edit().putStringSet(KEY_CUSTOM_BLOCKED_WORDS, currentWords).apply()
+            _configFlow.value = _configFlow.value.copy(customBlockedWords = currentWords)
+            return true
+        }
     }
 
     fun removeCustomWord(word: String) {
-        val currentWords = _configFlow.value.customBlockedWords.toMutableSet()
-        val changed = currentWords.removeAll { it.equals(word.trim(), ignoreCase = true) }
-        if (changed) {
-            prefs.edit().putStringSet(KEY_CUSTOM_BLOCKED_WORDS, currentWords).apply()
-            _configFlow.value = _configFlow.value.copy(customBlockedWords = currentWords)
+        synchronized(configLock) {
+            val currentWords = _configFlow.value.customBlockedWords.toMutableSet()
+            val changed = currentWords.removeAll { it.equals(word.trim(), ignoreCase = true) }
+            if (changed) {
+                prefs.edit().putStringSet(KEY_CUSTOM_BLOCKED_WORDS, currentWords).apply()
+                _configFlow.value = _configFlow.value.copy(customBlockedWords = currentWords)
+            }
         }
     }
 
     fun resetToDefaults() {
-        prefs.edit()
-            .putBoolean(KEY_IS_FILTERING_ENABLED, true)
-            .putBoolean(KEY_IS_UI_CONTROLS_ENABLED, true)
-            .putBoolean(KEY_IS_SYMBOLS_AND_NUMBERS_ENABLED, true)
-            .remove(KEY_CUSTOM_BLOCKED_WORDS)
-            .apply()
+        synchronized(configLock) {
+            prefs.edit()
+                .putBoolean(KEY_IS_FILTERING_ENABLED, true)
+                .putBoolean(KEY_IS_UI_CONTROLS_ENABLED, true)
+                .putBoolean(KEY_IS_SYMBOLS_AND_NUMBERS_ENABLED, true)
+                .remove(KEY_CUSTOM_BLOCKED_WORDS)
+                .apply()
 
-        _configFlow.value = FilterConfig.DEFAULT
+            _configFlow.value = FilterConfig.DEFAULT
+        }
     }
 
     private fun loadConfig(): FilterConfig {

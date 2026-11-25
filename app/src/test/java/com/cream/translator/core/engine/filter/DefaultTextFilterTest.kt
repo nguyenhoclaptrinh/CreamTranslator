@@ -170,4 +170,17 @@ class DefaultTextFilterTest {
         assertFalse(defaultFilter.shouldFilter("冒険が始まる", jaViPair))
         assertTrue(defaultFilter.shouldFilter("Cài đặt bộ lọc từ", jaViPair))
     }
+
+    @Test
+    fun shouldFilter_dynamicConfigProvider_updatesCachedCustomBlockedWords() {
+        var currentConfig = FilterConfig(customBlockedWords = setOf("Alpha"))
+        val dynamicFilter = DefaultTextFilter { currentConfig }
+
+        assertTrue(dynamicFilter.shouldFilter("alpha"))
+        assertFalse(dynamicFilter.shouldFilter("beta"))
+
+        currentConfig = FilterConfig(customBlockedWords = setOf("Beta"))
+        assertFalse(dynamicFilter.shouldFilter("alpha"))
+        assertTrue(dynamicFilter.shouldFilter("beta"))
+    }
 }

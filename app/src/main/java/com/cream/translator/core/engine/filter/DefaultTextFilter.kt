@@ -12,6 +12,21 @@ class DefaultTextFilter(
 ) : TextFilter {
     constructor(staticConfig: FilterConfig) : this({ staticConfig })
 
+    @Volatile
+    private var cachedRawCustomWords: Set<String> = emptySet()
+
+    @Volatile
+    private var cachedNormalizedCustomWords: Set<String> = emptySet()
+
+    private fun getNormalizedCustomWords(rawWords: Set<String>): Set<String> {
+        if (rawWords.isEmpty()) return emptySet()
+        if (rawWords == cachedRawCustomWords) return cachedNormalizedCustomWords
+        val normalizedSet = rawWords.map { it.trim().lowercase(Locale.ROOT) }.toSet()
+        cachedNormalizedCustomWords = normalizedSet
+        cachedRawCustomWords = rawWords.toSet()
+        return normalizedSet
+    }
+
     override fun shouldFilter(text: String): Boolean = shouldFilter(text, null)
 
     override fun shouldFilter(
@@ -44,11 +59,10 @@ class DefaultTextFilter(
         }
 
         // 1. Kiểm tra danh sách từ tùy biến của người dùng
-        if (config.customBlockedWords.isNotEmpty()) {
-            val customSet = config.customBlockedWords.map { it.trim().lowercase(Locale.ROOT) }.toSet()
-            if (customSet.contains(normalized)) {
-                return true
-            }
+        if (config.customBlockedWords.isNotEmpty() &&
+            getNormalizedCustomWords(config.customBlockedWords).contains(normalized)
+        ) {
+            return true
         }
 
         // 2. Kiểm tra nhóm điều hướng và nhãn UI

@@ -6,6 +6,9 @@ import android.view.WindowManager
 import com.cream.translator.core.model.TextRegion
 import com.cream.translator.core.model.TranslationResult
 import com.cream.translator.testutil.BaseRobolectricTest
+import io.mockk.spyk
+import io.mockk.verify
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -65,4 +68,36 @@ class OverlayWindowManagerTest : BaseRobolectricTest() {
         assertTrue(width > 0)
         assertTrue(height > 0)
     }
+
+    @Test
+    fun dismissOverlays_usesRemoveViewImmediateInsteadOfDeferredRemoveView() =
+        runTest(testDispatcher) {
+            val spyWm = spyk(windowManager)
+            val manager = OverlayWindowManager(context, spyWm)
+
+            val results =
+                listOf(
+                    TranslationResult(
+                        region =
+                            TextRegion(
+                                id = "reg_1",
+                                originalText = "Hello",
+                                boundingBox = Rect(0, 0, 100, 50),
+                                backgroundColor = -1,
+                                textColor = -16777216,
+                            ),
+                        translatedText = "Xin chào",
+                        executionTimeMs = 10L,
+                    ),
+                )
+
+            assertTrue(manager.showTranslationOverlay(results) {})
+            assertTrue(manager.dismissTranslationOverlay())
+
+            assertTrue(manager.showRegionSelector(scope = this, onRegionSelected = {}, onCancel = {}))
+            manager.dismissRegionSelector()
+
+            verify(exactly = 2) { spyWm.removeViewImmediate(any()) }
+            verify(exactly = 0) { spyWm.removeView(any()) }
+        }
 }

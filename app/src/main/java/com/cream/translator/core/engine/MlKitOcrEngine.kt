@@ -33,7 +33,7 @@ class MlKitOcrEngine : OcrEngine {
                     // and avoid line overlapping / vertical collision when translated text expands
                     for (block in visionText.textBlocks) {
                         val box = block.boundingBox ?: Rect(0, 0, 0, 0)
-                        val text = block.text.replace("\\s+".toRegex(), " ").trim()
+                        val text = block.text.replace(WHITESPACE_REGEX, " ").trim()
                         if (text.isNotBlank() &&
                             box.width() > OverlayConfig.MIN_BOX_DIMENSION &&
                             box.height() > OverlayConfig.MIN_BOX_DIMENSION
@@ -64,6 +64,12 @@ class MlKitOcrEngine : OcrEngine {
             recognizer.close()
         } catch (e: java.io.IOException) {
             Timber.e(e, "Error closing ML Kit recognizer")
+        } catch (e: IllegalStateException) {
+            Timber.e(e, "Illegal state closing ML Kit recognizer")
         }
+    }
+
+    companion object {
+        private val WHITESPACE_REGEX = Regex("\\s+")
     }
 }

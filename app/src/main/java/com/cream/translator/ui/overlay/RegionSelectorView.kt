@@ -75,6 +75,11 @@ class RegionSelectorView
             onRegionSelectedListener = listener
         }
 
+        fun clearListeners() {
+            onRegionSelectedListener = null
+            onCancelListener = null
+        }
+
         /**
          * Khởi động bộ đếm tự động hủy sau [AUTO_DISMISS_DELAY_MS] ms.
          * Scope được truyền vào từ caller — không tự tạo scope (architecture-invariants.md §2.2).

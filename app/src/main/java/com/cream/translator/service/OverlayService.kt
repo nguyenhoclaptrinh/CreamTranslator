@@ -47,6 +47,8 @@ import timber.log.Timber
 class OverlayService : Service() {
     private val exceptionHandler =
         createNamedExceptionHandler("OverlayService") { throwable ->
+            overlayWindowManager.dismissTranslationOverlay()
+            overlayWindowManager.dismissRegionSelector()
             pipelineCoordinator.updateState(
                 TranslationState.Error(
                     error = CreamError.OverlayError.WindowAttachmentFailed(throwable),
@@ -82,13 +84,16 @@ class OverlayService : Service() {
     private val filterPreferencesRepository by lazy { FilterPreferencesRepository.getInstance(this) }
     private val textFilter by lazy { DefaultTextFilter { filterPreferencesRepository.getConfig() } }
 
-    private val pipelineCoordinator: ITranslationPipelineCoordinator by lazy {
-        TranslationPipelineCoordinator(
-            ocrEngine = MlKitOcrEngine(),
-            translationEngine = MlKitTranslationEngine(),
-            textFilter = textFilter,
-        )
-    }
+    private val pipelineCoordinatorDelegate =
+        lazy<ITranslationPipelineCoordinator> {
+            TranslationPipelineCoordinator(
+                ocrEngine = MlKitOcrEngine(),
+                translationEngine = MlKitTranslationEngine(),
+                textFilter = textFilter,
+            )
+        }
+
+    private val pipelineCoordinator: ITranslationPipelineCoordinator by pipelineCoordinatorDelegate
 
     val state: StateFlow<TranslationState>
         get() = pipelineCoordinator.state
@@ -150,8 +155,11 @@ class OverlayService : Service() {
                 onLongPress = { handleTriggerLongPress() },
             )
         if (attached) {
+            isRunning = true
             Toast.makeText(this, getString(R.string.overlay_trigger_enabled), Toast.LENGTH_SHORT).show()
         } else {
+            isRunning = false
+            TranslatorController.stop(this)
             stopSelf()
         }
     }
@@ -305,6 +313,7 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         try {
             unregisterReceiver(systemEventsReceiver)
         } catch (e: IllegalArgumentException) {
@@ -314,8 +323,20 @@ class OverlayService : Service() {
         overlayWindowManager.dismissTranslationOverlay()
         overlayWindowManager.dismissRegionSelector()
         floatingTriggerController.destroy()
-        pipelineCoordinator.close()
+        if (pipelineCoordinatorDelegate.isInitialized()) {
+            pipelineCoordinator.close()
+        }
         serviceScope.cancel()
+        TranslatorController.updateServiceState(false)
+        if (ScreenCaptureService.instance != null) {
+            try {
+                stopService(Intent(this, ScreenCaptureService::class.java))
+            } catch (e: SecurityException) {
+                Timber.w(e, "SecurityException khi dừng ScreenCaptureService từ OverlayService.onDestroy")
+            } catch (e: IllegalStateException) {
+                Timber.w(e, "IllegalStateException khi dừng ScreenCaptureService từ OverlayService.onDestroy")
+            }
+        }
         super.onDestroy()
         Timber.d("OverlayService destroyed")
     }
@@ -324,5 +345,9 @@ class OverlayService : Service() {
         const val ACTION_STOP = "com.cream.translator.action.STOP_OVERLAY"
         const val EXTRA_SOURCE_LANG = "extra_source_lang"
         const val EXTRA_TARGET_LANG = "extra_target_lang"
+
+        @Volatile
+        var isRunning: Boolean = false
+            private set
     }
 }

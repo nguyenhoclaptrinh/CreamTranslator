@@ -90,7 +90,8 @@ class DiagnosticExportHelper(
         val hasPreviousLogs = previousFile.exists() && previousFile.length() > 0L
         if (hasPreviousLogs) {
             writer.println("--- Previous Session Disk Log ---")
-            writer.println(previousFile.readText())
+            previousFile.bufferedReader().use { reader -> reader.copyTo(writer) }
+            writer.println()
         }
 
         // 2. Append active session disk log if available
@@ -98,7 +99,8 @@ class DiagnosticExportHelper(
         val hasActiveLogs = activeFile.exists() && activeFile.length() > 0L
         if (hasActiveLogs) {
             writer.println("--- Active Session Disk Log ---")
-            writer.println(activeFile.readText())
+            activeFile.bufferedReader().use { reader -> reader.copyTo(writer) }
+            writer.println()
         }
 
         // 3. Fallback or complement with in-memory buffer if files were empty

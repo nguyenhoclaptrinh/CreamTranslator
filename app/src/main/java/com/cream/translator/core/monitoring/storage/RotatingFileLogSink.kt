@@ -23,6 +23,7 @@ class RotatingFileLogSink(
     private val maxFileSizeBytes: Long = DEFAULT_MAX_FILE_SIZE,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
 ) : LogSink, AutoCloseable {
+    private val fileLock = Any()
     private val logChannel = Channel<LogEntry>(capacity = 500)
     private val activeFile: File get() = File(logDirectory, ACTIVE_LOG_FILENAME)
     private val previousFile: File get() = File(logDirectory, PREVIOUS_LOG_FILENAME)
@@ -54,13 +55,17 @@ class RotatingFileLogSink(
     }
 
     private fun writeEntry(entry: LogEntry) {
-        try {
-            rotateIfExceeded()
-            PrintWriter(FileWriter(activeFile, true)).use { writer ->
-                writer.println(entry.toFormattedString())
+        synchronized(fileLock) {
+            try {
+                rotateIfExceeded()
+                PrintWriter(FileWriter(activeFile, true)).use { writer ->
+                    writer.println(entry.toFormattedString())
+                }
+            } catch (_: java.io.IOException) {
+                // Fail silently to prevent logging failures from crashing the host application
+            } catch (_: SecurityException) {
+                // Fail silently on restricted filesystem permissions
             }
-        } catch (_: Exception) {
-            // Fail silently to prevent logging failures from crashing the host application
         }
     }
 
@@ -76,24 +81,27 @@ class RotatingFileLogSink(
     /**
      * Returns all existing log files in chronological order (previous first, then active).
      */
-    fun getLogFiles(): List<File> {
-        val files = mutableListOf<File>()
-        if (previousFile.exists() && previousFile.length() > 0) {
-            files.add(previousFile)
+    fun getLogFiles(): List<File> =
+        synchronized(fileLock) {
+            val files = mutableListOf<File>()
+            if (previousFile.exists() && previousFile.length() > 0) {
+                files.add(previousFile)
+            }
+            if (activeFile.exists() && activeFile.length() > 0) {
+                files.add(activeFile)
+            }
+            files
         }
-        if (activeFile.exists() && activeFile.length() > 0) {
-            files.add(activeFile)
-        }
-        return files
-    }
 
     /**
      * Clears all log files from disk.
      */
     suspend fun clearLogs() =
         withContext(Dispatchers.IO) {
-            if (activeFile.exists()) activeFile.delete()
-            if (previousFile.exists()) previousFile.delete()
+            synchronized(fileLock) {
+                if (activeFile.exists()) activeFile.delete()
+                if (previousFile.exists()) previousFile.delete()
+            }
         }
 
     companion object {
