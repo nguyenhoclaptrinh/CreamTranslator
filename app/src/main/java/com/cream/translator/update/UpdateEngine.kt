@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.File
@@ -27,9 +28,10 @@ class UpdateEngine(
 ) {
     suspend fun checkForUpdate(currentVersionName: String): Result<AppReleaseInfo?> =
         withContext(Dispatchers.IO) {
+            var connection: HttpURLConnection? = null
             try {
                 val apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases/latest"
-                val connection =
+                connection =
                     (URL(apiUrl).openConnection() as HttpURLConnection).apply {
                         requestMethod = "GET"
                         connectTimeout = TIMEOUT_MS
@@ -53,7 +55,7 @@ class UpdateEngine(
                 }
 
                 val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-                Result.success(parseReleaseJson(responseBody, currentVersionName))
+                parseReleaseResult(responseBody, currentVersionName)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (e: UnknownHostException) {
@@ -68,10 +70,23 @@ class UpdateEngine(
             } catch (e: SecurityException) {
                 Timber.e(e, "Security error checking for updates")
                 Result.failure(e)
+            } finally {
+                connection?.disconnect()
             }
         }
 
-    private fun parseReleaseJson(
+    internal fun parseReleaseResult(
+        responseBody: String,
+        currentVersionName: String,
+    ): Result<AppReleaseInfo?> =
+        try {
+            Result.success(parseReleaseJson(responseBody, currentVersionName))
+        } catch (e: JSONException) {
+            Timber.e(e, "Malformed JSON payload from GitHub release API")
+            Result.failure(e)
+        }
+
+    internal fun parseReleaseJson(
         responseBody: String,
         currentVersionName: String,
     ): AppReleaseInfo? {
@@ -185,8 +200,15 @@ class UpdateEngine(
         var redirects = 0
 
         while (redirects < MAX_REDIRECTS) {
+            val parsedUrl = URL(currentUrl)
+            val isLocalHost = parsedUrl.host == "localhost" || parsedUrl.host == "127.0.0.1"
+            if (parsedUrl.protocol != "https" && !isLocalHost) {
+                Timber.w("Blocked insecure update redirect protocol: %s", parsedUrl.protocol)
+                return null
+            }
+
             val conn =
-                (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                (parsedUrl.openConnection() as HttpURLConnection).apply {
                     connectTimeout = TIMEOUT_MS
                     readTimeout = TIMEOUT_MS
                     setRequestProperty("User-Agent", "CreamTranslator-Android")
@@ -197,8 +219,8 @@ class UpdateEngine(
             if (status in REDIRECT_STATUS_CODES) {
                 val newUrl = conn.getHeaderField("Location")
                 conn.disconnect()
-                if (newUrl == null) return null
-                currentUrl = newUrl
+                if (newUrl.isNullOrBlank()) return null
+                currentUrl = URL(parsedUrl, newUrl).toString()
                 redirects++
             } else if (status == HttpURLConnection.HTTP_OK) {
                 return conn

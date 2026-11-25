@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Điều phối trung tâm cho toàn bộ vòng đời của các dịch vụ phiên dịch CreamTranslator.
@@ -29,45 +30,46 @@ object TranslatorController {
         resultData: Intent,
         languagePair: LanguagePair = LanguagePair("en", "vi"),
     ) {
+        val appContext = context.applicationContext ?: context
         try {
             val captureIntent =
-                Intent(context, ScreenCaptureService::class.java).apply {
+                Intent(appContext, ScreenCaptureService::class.java).apply {
                     putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, resultCode)
                     putExtra(ScreenCaptureService.EXTRA_RESULT_DATA, resultData)
                 }
-            context.startForegroundService(captureIntent)
+            appContext.startForegroundService(captureIntent)
 
             val overlayIntent =
-                Intent(context, OverlayService::class.java).apply {
+                Intent(appContext, OverlayService::class.java).apply {
                     putExtra(OverlayService.EXTRA_SOURCE_LANG, languagePair.sourceLanguage)
                     putExtra(OverlayService.EXTRA_TARGET_LANG, languagePair.targetLanguage)
                 }
-            context.startService(overlayIntent)
+            appContext.startService(overlayIntent)
 
             _isServiceRunning.value = true
             Timber.i("TranslatorController: Bắt đầu toàn bộ dịch vụ phiên dịch màn hình")
         } catch (e: SecurityException) {
             Timber.e(e, "TranslatorController: Không đủ quyền khởi chạy dịch vụ")
-            _isServiceRunning.value = false
+            stop(appContext)
         } catch (e: IllegalStateException) {
             Timber.e(e, "TranslatorController: Không thể khởi chạy dịch vụ ở trạng thái hiện tại")
-            _isServiceRunning.value = false
+            stop(appContext)
         }
     }
 
-    private var isStopping = false
+    private val isStopping = AtomicBoolean(false)
 
     /**
      * Dừng toàn bộ các dịch vụ dịch màn hình, gỡ bỏ các lớp phủ và thu hồi tài nguyên.
      */
     fun stop(context: Context) {
-        if (isStopping) return
-        isStopping = true
+        if (!isStopping.compareAndSet(false, true)) return
         _isServiceRunning.value = false
+        val appContext = context.applicationContext ?: context
         try {
             // Dừng trực tiếp qua stopService để giải phóng vòng đời sạch sẽ, không khởi chạy lại service
-            context.stopService(Intent(context, OverlayService::class.java))
-            context.stopService(Intent(context, ScreenCaptureService::class.java))
+            appContext.stopService(Intent(appContext, OverlayService::class.java))
+            appContext.stopService(Intent(appContext, ScreenCaptureService::class.java))
 
             Timber.i("TranslatorController: Đã gửi lệnh dừng toàn bộ dịch vụ phiên dịch")
         } catch (e: SecurityException) {
@@ -75,7 +77,7 @@ object TranslatorController {
         } catch (e: IllegalStateException) {
             Timber.e(e, "TranslatorController: Lỗi trạng thái khi dừng dịch vụ")
         } finally {
-            isStopping = false
+            isStopping.set(false)
         }
     }
 }

@@ -37,6 +37,8 @@ class FloatingTriggerController(
         private set
 
     private var snapAnimator: ValueAnimator? = null
+    private var longPressJob: Job? = null
+    private var pendingSingleTapJob: Job? = null
 
     val isVisible: Boolean
         get() = floatingTriggerView?.visibility == View.VISIBLE
@@ -54,6 +56,10 @@ class FloatingTriggerController(
         if (!Settings.canDrawOverlays(context)) {
             Timber.w("FloatingTriggerController: Quyền vẽ đè (Overlay) chưa được cấp")
             return false
+        }
+
+        if (floatingTriggerView != null) {
+            destroy()
         }
 
         val layoutType =
@@ -107,6 +113,8 @@ class FloatingTriggerController(
             Timber.d("Floating trigger attached successfully")
             true
         } else {
+            triggerButton.setOnTouchListener(null)
+            triggerParams = null
             Timber.e("Failed to attach floating overlay view")
             false
         }
@@ -119,14 +127,15 @@ class FloatingTriggerController(
         val screenWidth = windowManager.getScreenWidth()
         val screenHeight = windowManager.getScreenHeight()
         val density = context.resources.displayMetrics.density
-        val size = (52 * density).toInt()
+        val size = (OverlayConfig.TRIGGER_SIZE_DP * density).toInt()
         val margin = (12 * density).toInt()
 
         val safeMaxY = (screenHeight - size - margin).coerceAtLeast(margin)
         params.y = params.y.coerceIn(margin, safeMaxY)
 
         val isLeft = (params.x + size / 2) < (screenWidth / 2)
-        val targetX = if (isLeft) margin else (screenWidth - size - margin)
+        val rightEdgeX = (screenWidth - size - margin).coerceAtLeast(margin)
+        val targetX = if (isLeft) margin else rightEdgeX
 
         snapAnimator?.cancel()
         snapAnimator =
@@ -155,20 +164,29 @@ class FloatingTriggerController(
         var initialTouchX = 0f
         var initialTouchY = 0f
         var isClick = true
-        var longPressJob: Job? = null
-        var pendingSingleTapJob: Job? = null
         var lastTapUpTimeMs = -1L
         val doubleTapWindowMs = 300L
+        var gestureScreenWidth = windowManager.getScreenWidth()
+        var gestureScreenHeight = windowManager.getScreenHeight()
+        var gestureSize = params.width
+        var gestureMargin = (12 * context.resources.displayMetrics.density).toInt()
 
         view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     snapAnimator?.cancel()
+                    longPressJob?.cancel()
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     isClick = true
+
+                    val density = context.resources.displayMetrics.density
+                    gestureScreenWidth = windowManager.getScreenWidth()
+                    gestureScreenHeight = windowManager.getScreenHeight()
+                    gestureSize = (OverlayConfig.TRIGGER_SIZE_DP * density).toInt()
+                    gestureMargin = (12 * density).toInt()
 
                     longPressJob =
                         coroutineScope.launch {
@@ -193,15 +211,10 @@ class FloatingTriggerController(
                         longPressJob?.cancel()
                         pendingSingleTapJob?.cancel()
                     }
-                    val screenWidth = windowManager.getScreenWidth()
-                    val screenHeight = windowManager.getScreenHeight()
-                    val density = context.resources.displayMetrics.density
-                    val size = (52 * density).toInt()
-                    val margin = (12 * density).toInt()
-
-                    params.x = (initialX + dx).coerceIn(-margin, screenWidth - size + margin)
-                    val safeMaxY = (screenHeight - size - margin).coerceAtLeast(margin)
-                    params.y = (initialY + dy).coerceIn(margin, safeMaxY)
+                    val safeMaxX = (gestureScreenWidth - gestureSize + gestureMargin).coerceAtLeast(-gestureMargin)
+                    params.x = (initialX + dx).coerceIn(-gestureMargin, safeMaxX)
+                    val safeMaxY = (gestureScreenHeight - gestureSize - gestureMargin).coerceAtLeast(gestureMargin)
+                    params.y = (initialY + dy).coerceIn(gestureMargin, safeMaxY)
                     windowManager.safeUpdateViewLayout(view, params)
                     true
                 }
@@ -251,11 +264,14 @@ class FloatingTriggerController(
     fun handleConfigurationChange() {
         floatingTriggerView?.let { trigger ->
             triggerParams?.let { params ->
-                val displayMetrics = context.resources.displayMetrics
-                val maxX = displayMetrics.widthPixels - params.width
-                val maxY = displayMetrics.heightPixels - params.height
-                params.x = params.x.coerceIn(0, maxOf(0, maxX))
-                params.y = params.y.coerceIn(0, maxOf(0, maxY))
+                val screenWidth = windowManager.getScreenWidth()
+                val screenHeight = windowManager.getScreenHeight()
+                val density = context.resources.displayMetrics.density
+                val margin = (12 * density).toInt()
+                val maxX = (screenWidth - params.width - margin).coerceAtLeast(margin)
+                val maxY = (screenHeight - params.height - margin).coerceAtLeast(margin)
+                params.x = params.x.coerceIn(margin, maxX)
+                params.y = params.y.coerceIn(margin, maxY)
                 windowManager.safeUpdateViewLayout(trigger, params)
             }
         }
@@ -264,9 +280,15 @@ class FloatingTriggerController(
     fun destroy() {
         snapAnimator?.cancel()
         snapAnimator = null
-        if (floatingTriggerView != null) {
-            windowManager.safeRemoveView(floatingTriggerView)
+        longPressJob?.cancel()
+        longPressJob = null
+        pendingSingleTapJob?.cancel()
+        pendingSingleTapJob = null
+        floatingTriggerView?.let { view ->
+            view.setOnTouchListener(null)
+            windowManager.safeRemoveView(view)
             floatingTriggerView = null
         }
+        triggerParams = null
     }
 }

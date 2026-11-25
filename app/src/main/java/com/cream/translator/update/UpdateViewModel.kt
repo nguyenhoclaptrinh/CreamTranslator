@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.cream.translator.BuildConfig
 import com.cream.translator.update.model.AppReleaseInfo
 import com.cream.translator.update.model.DownloadState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,52 +49,59 @@ class UpdateViewModel
         private val _uiState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
         val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
 
+        private var checkJob: Job? = null
+        private var downloadJob: Job? = null
+
         fun checkForUpdate() {
-            viewModelScope.launch {
-                _uiState.value = UpdateUiState.Checking
-                val result = engine.checkForUpdate(BuildConfig.VERSION_NAME)
-                result
-                    .onSuccess { releaseInfo ->
-                        if (releaseInfo != null) {
-                            _uiState.value = UpdateUiState.UpdateAvailable(releaseInfo)
-                        } else {
-                            _uiState.value = UpdateUiState.NoUpdateAvailable(BuildConfig.VERSION_NAME)
+            checkJob?.cancel()
+            checkJob =
+                viewModelScope.launch {
+                    _uiState.value = UpdateUiState.Checking
+                    val result = engine.checkForUpdate(BuildConfig.VERSION_NAME)
+                    result
+                        .onSuccess { releaseInfo ->
+                            if (releaseInfo != null) {
+                                _uiState.value = UpdateUiState.UpdateAvailable(releaseInfo)
+                            } else {
+                                _uiState.value = UpdateUiState.NoUpdateAvailable(BuildConfig.VERSION_NAME)
+                            }
+                        }.onFailure { error ->
+                            _uiState.value = UpdateUiState.Error(error.message ?: "Kiểm tra cập nhật thất bại")
                         }
-                    }.onFailure { error ->
-                        _uiState.value = UpdateUiState.Error(error.message ?: "Kiểm tra cập nhật thất bại")
-                    }
-            }
+                }
         }
 
         fun startDownload(releaseInfo: AppReleaseInfo) {
-            viewModelScope.launch {
-                // Cache Hygiene: purge legacy cached APK and temporary files before downloading new version
-                val updateDir = File(getApplication<Application>().cacheDir, "updates")
-                if (updateDir.exists()) {
-                    updateDir.listFiles()?.forEach { file ->
-                        if (file.isFile && (file.name.endsWith(".apk") || file.name.endsWith(".tmp"))) {
-                            file.delete()
+            if (downloadJob?.isActive == true) return
+            downloadJob =
+                viewModelScope.launch {
+                    // Cache Hygiene: purge legacy cached APK and temporary files before downloading new version
+                    val updateDir = File(getApplication<Application>().cacheDir, "updates")
+                    if (updateDir.exists()) {
+                        updateDir.listFiles()?.forEach { file ->
+                            if (file.isFile && (file.name.endsWith(".apk") || file.name.endsWith(".tmp"))) {
+                                file.delete()
+                            }
+                        }
+                    }
+
+                    val destinationFile = File(updateDir, "CreamTranslator-${releaseInfo.tagName}.apk")
+
+                    engine.downloadApk(releaseInfo.downloadUrl, destinationFile).collect { state ->
+                        when (state) {
+                            is DownloadState.Progress -> {
+                                _uiState.value = UpdateUiState.Downloading(releaseInfo, state.percentage)
+                            }
+                            is DownloadState.Completed -> {
+                                _uiState.value = UpdateUiState.ReadyToInstall(state.apkFile)
+                            }
+                            is DownloadState.Error -> {
+                                _uiState.value = UpdateUiState.Error(state.message)
+                            }
+                            DownloadState.Idle -> Unit
                         }
                     }
                 }
-
-                val destinationFile = File(updateDir, "CreamTranslator-${releaseInfo.tagName}.apk")
-
-                engine.downloadApk(releaseInfo.downloadUrl, destinationFile).collect { state ->
-                    when (state) {
-                        is DownloadState.Progress -> {
-                            _uiState.value = UpdateUiState.Downloading(releaseInfo, state.percentage)
-                        }
-                        is DownloadState.Completed -> {
-                            _uiState.value = UpdateUiState.ReadyToInstall(state.apkFile)
-                        }
-                        is DownloadState.Error -> {
-                            _uiState.value = UpdateUiState.Error(state.message)
-                        }
-                        DownloadState.Idle -> Unit
-                    }
-                }
-            }
         }
 
         fun dismissDialog() {

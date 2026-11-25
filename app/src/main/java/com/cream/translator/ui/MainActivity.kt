@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -176,6 +177,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkPermissions()
+    }
+
     private fun triggerApkInstall(apkFile: File) {
         if (!UpdateInstaller.canRequestPackageInstalls(this)) {
             Toast.makeText(
@@ -238,13 +244,17 @@ fun TranslatorDashboard(
     var selectedPair by remember { mutableStateOf(supportedPairs.first()) }
     var isModelReady by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
+    var downloadRequestId by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedPair) {
+        val requestId = ++downloadRequestId
         isDownloading = true
         isModelReady = false
         actions.onDownloadModel(selectedPair) { success ->
-            isModelReady = success
-            isDownloading = false
+            if (downloadRequestId == requestId) {
+                isModelReady = success
+                isDownloading = false
+            }
         }
     }
 
@@ -286,10 +296,13 @@ fun TranslatorDashboard(
             selectedPair = selectedPair,
             actions = actions,
             onTriggerModelDownload = {
+                val requestId = ++downloadRequestId
                 isDownloading = true
                 actions.onDownloadModel(selectedPair) { success ->
-                    isModelReady = success
-                    isDownloading = false
+                    if (downloadRequestId == requestId) {
+                        isModelReady = success
+                        isDownloading = false
+                    }
                 }
             },
         )

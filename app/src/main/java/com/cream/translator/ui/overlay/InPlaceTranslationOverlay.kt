@@ -22,11 +22,26 @@ class InPlaceTranslationOverlay
         attrs: AttributeSet? = null,
         defStyleAttr: Int = 0,
     ) : View(context, attrs, defStyleAttr) {
+        private data class PreparedPlate(
+            val regionId: String,
+            val plateRect: RectF,
+            val bgColor: Int,
+            val staticLayout: StaticLayout,
+        )
+
         private val results = mutableListOf<TranslationResult>()
         private val toggledRegions = mutableSetOf<String>()
         private val renderedPlates = mutableMapOf<String, RectF>()
+        private val preparedPlates = mutableListOf<PreparedPlate>()
         private val windowLocationOnScreen = IntArray(2)
+        private var cachedWidth = -1
+        private var cachedHeight = -1
+        private var cachedWindowOffsetX = Int.MIN_VALUE
+        private var cachedWindowOffsetY = Int.MIN_VALUE
+        private var layoutDirty = true
         var onDismissListener: (() -> Unit)? = null
+
+        private val defaultBgColor = Color.parseColor(OverlayConfig.OVERLAY_BG_COLOR)
 
         private val bgPaint =
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -56,6 +71,8 @@ class InPlaceTranslationOverlay
             results.addAll(newResults)
             toggledRegions.clear()
             renderedPlates.clear()
+            preparedPlates.clear()
+            layoutDirty = true
             invalidate()
         }
 
@@ -63,66 +80,115 @@ class InPlaceTranslationOverlay
             results.clear()
             toggledRegions.clear()
             renderedPlates.clear()
+            preparedPlates.clear()
+            layoutDirty = true
             invalidate()
+        }
+
+        override fun onSizeChanged(
+            w: Int,
+            h: Int,
+            oldw: Int,
+            oldh: Int,
+        ) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            if (w != oldw || h != oldh) {
+                layoutDirty = true
+            }
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if (results.isEmpty()) return
+
             getLocationOnScreen(windowLocationOnScreen)
-            val windowOffsetX = windowLocationOnScreen[0].toFloat()
-            val windowOffsetY = windowLocationOnScreen[1].toFloat()
-            for (item in results) {
-                drawTranslationItem(canvas, item, windowOffsetX, windowOffsetY)
+            val windowOffsetX = windowLocationOnScreen[0]
+            val windowOffsetY = windowLocationOnScreen[1]
+
+            if (needsPlateRebuild(windowOffsetX, windowOffsetY)) {
+                rebuildPreparedPlates(windowOffsetX.toFloat(), windowOffsetY.toFloat())
+                cachedWidth = width
+                cachedHeight = height
+                cachedWindowOffsetX = windowOffsetX
+                cachedWindowOffsetY = windowOffsetY
+                layoutDirty = false
+            }
+
+            val density = resources.displayMetrics.density
+            val cornerRadius = 6f * density
+            for (plate in preparedPlates) {
+                bgPaint.color = plate.bgColor
+                canvas.drawRoundRect(plate.plateRect, cornerRadius, cornerRadius, bgPaint)
+                canvas.drawRoundRect(plate.plateRect, cornerRadius, cornerRadius, borderPaint)
+
+                canvas.save()
+                val textOffsetX = plate.plateRect.centerX() - plate.staticLayout.width / 2f
+                val textOffsetY = plate.plateRect.centerY() - plate.staticLayout.height / 2f
+                canvas.translate(textOffsetX, textOffsetY)
+                plate.staticLayout.draw(canvas)
+                canvas.restore()
             }
         }
 
-        private fun drawTranslationItem(
-            canvas: Canvas,
-            item: TranslationResult,
+        private fun needsPlateRebuild(
+            windowOffsetX: Int,
+            windowOffsetY: Int,
+        ): Boolean {
+            val sizeChanged = width != cachedWidth || height != cachedHeight
+            val offsetChanged = windowOffsetX != cachedWindowOffsetX || windowOffsetY != cachedWindowOffsetY
+            return layoutDirty || sizeChanged || offsetChanged
+        }
+
+        private fun rebuildPreparedPlates(
             windowOffsetX: Float,
             windowOffsetY: Float,
         ) {
+            preparedPlates.clear()
+            renderedPlates.clear()
+
+            val localBoxes =
+                results.map { item ->
+                    val rect = item.region.boundingBox
+                    TextInpainter.BoxCoordinates(
+                        rect.left.toFloat() - windowOffsetX,
+                        rect.top.toFloat() - windowOffsetY,
+                        rect.right.toFloat() - windowOffsetX,
+                        rect.bottom.toFloat() - windowOffsetY,
+                    )
+                }
+
+            for (index in results.indices) {
+                val prepared =
+                    buildPreparedPlate(
+                        item = results[index],
+                        targetIndex = index,
+                        localBoxes = localBoxes,
+                    )
+                preparedPlates.add(prepared)
+                renderedPlates[prepared.regionId] = prepared.plateRect
+            }
+        }
+
+        private fun buildPreparedPlate(
+            item: TranslationResult,
+            targetIndex: Int,
+            localBoxes: List<TextInpainter.BoxCoordinates>,
+        ): PreparedPlate {
             val rect = item.region.boundingBox
             val density = resources.displayMetrics.density
             val padX = 6f * density
             val padY = 4f * density
-            val cornerRadius = 6f * density
 
             val isShowingOriginal = toggledRegions.contains(item.region.id)
             val displayText = if (isShowingOriginal) item.region.originalText else item.translatedText
 
-            val bgColor = item.region.backgroundColor ?: Color.parseColor(OverlayConfig.OVERLAY_BG_COLOR)
-            bgPaint.color = bgColor
-
+            val bgColor = item.region.backgroundColor ?: defaultBgColor
             val textColor =
                 item.region.textColor
                     ?: TextInpainter.calculateContrastingTextColor(bgColor)
-            textPaint.color = textColor
 
-            // Map physical screen coordinates to local view canvas space
-            val targetBox =
-                TextInpainter.BoxCoordinates(
-                    rect.left.toFloat(),
-                    rect.top.toFloat(),
-                    rect.right.toFloat(),
-                    rect.bottom.toFloat(),
-                ).offset(-windowOffsetX, -windowOffsetY)
-
-            // Gather other bounding boxes mapped to local view coordinates
-            val otherBoxes =
-                results.mapNotNull { other ->
-                    if (other.region.id != item.region.id) {
-                        val ob = other.region.boundingBox
-                        TextInpainter.BoxCoordinates(
-                            ob.left.toFloat(),
-                            ob.top.toFloat(),
-                            ob.right.toFloat(),
-                            ob.bottom.toFloat(),
-                        ).offset(-windowOffsetX, -windowOffsetY)
-                    } else {
-                        null
-                    }
-                }
+            val targetBox = localBoxes[targetIndex]
+            val otherBoxes = localBoxes.filterIndexed { idx, _ -> idx != targetIndex }
             val constraints =
                 TextInpainter.calculateCollisionFreeExpansion(
                     targetBox = targetBox,
@@ -130,7 +196,6 @@ class InPlaceTranslationOverlay
                     safetyMargin = 3f * density,
                 )
 
-            // Calculate starting font size
             var currentSp =
                 TextInpainter.calculateOptimalFontSize(
                     rect.width(),
@@ -138,31 +203,32 @@ class InPlaceTranslationOverlay
                     displayText.length,
                     density,
                 )
-            textPaint.textSize = currentSp * density
+            val platePaint =
+                TextPaint(textPaint).apply {
+                    color = textColor
+                    textSize = currentSp * density
+                }
 
-            // For single-line labels or buttons, allow safe horizontal expansion if room permits
             val isSingleLine = rect.height() < 42f * density
             val baseContentWidth = maxOf(20f, rect.width() - 2f * padX)
             val targetContentWidth =
                 if (isSingleLine) {
-                    val naturalTextWidth = textPaint.measureText(displayText)
+                    val naturalTextWidth = platePaint.measureText(displayText)
                     val maxSafeWidth = baseContentWidth + constraints.maxExpandLeft + constraints.maxExpandRight
                     naturalTextWidth.coerceIn(baseContentWidth, maxSafeWidth).toInt()
                 } else {
                     baseContentWidth.toInt()
                 }
 
-            var staticLayout = createStaticLayout(displayText, targetContentWidth)
+            var staticLayout = createStaticLayout(displayText, targetContentWidth, platePaint)
 
-            // Downscale font size if rendered text exceeds bounding box height
             val targetHeight = rect.height() - 2f * padY
             while (staticLayout.height > targetHeight && currentSp > 10f) {
                 currentSp = maxOf(10f, currentSp - 1f)
-                textPaint.textSize = currentSp * density
-                staticLayout = createStaticLayout(displayText, targetContentWidth)
+                platePaint.textSize = currentSp * density
+                staticLayout = createStaticLayout(displayText, targetContentWidth, platePaint)
             }
 
-            // Compute adaptive plate bounds that respect neighboring box boundaries
             val plateBounds =
                 TextInpainter.computePlateBounds(
                     box = targetBox,
@@ -175,28 +241,21 @@ class InPlaceTranslationOverlay
                         ),
                     constraints = constraints,
                 )
-            val plateRectF = RectF(plateBounds.left, plateBounds.top, plateBounds.right, plateBounds.bottom)
-            renderedPlates[item.region.id] = plateRectF
-
-            // Draw rounded inpainting background plate
-            canvas.drawRoundRect(plateRectF, cornerRadius, cornerRadius, bgPaint)
-            canvas.drawRoundRect(plateRectF, cornerRadius, cornerRadius, borderPaint)
-
-            // Center static layout vertically and horizontally inside the adaptive plate
-            canvas.save()
-            val textOffsetX = plateRectF.centerX() - staticLayout.width / 2f
-            val textOffsetY = plateRectF.centerY() - staticLayout.height / 2f
-            canvas.translate(textOffsetX, textOffsetY)
-            staticLayout.draw(canvas)
-            canvas.restore()
+            return PreparedPlate(
+                regionId = item.region.id,
+                plateRect = RectF(plateBounds.left, plateBounds.top, plateBounds.right, plateBounds.bottom),
+                bgColor = bgColor,
+                staticLayout = staticLayout,
+            )
         }
 
         private fun createStaticLayout(
             text: String,
             width: Int,
+            paint: TextPaint,
         ): StaticLayout =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                StaticLayout.Builder.obtain(text, 0, text.length, textPaint, width)
+                StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
                     .setAlignment(Layout.Alignment.ALIGN_CENTER)
                     .setIncludePad(false)
                     .build()
@@ -204,7 +263,7 @@ class InPlaceTranslationOverlay
                 @Suppress("DEPRECATION")
                 StaticLayout(
                     text,
-                    textPaint,
+                    paint,
                     width,
                     Layout.Alignment.ALIGN_CENTER,
                     1.0f,
@@ -238,6 +297,7 @@ class InPlaceTranslationOverlay
                             } else {
                                 toggledRegions.add(item.region.id)
                             }
+                            layoutDirty = true
                             invalidate()
                             return true
                         }

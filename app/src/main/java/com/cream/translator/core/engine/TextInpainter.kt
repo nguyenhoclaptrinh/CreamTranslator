@@ -33,43 +33,58 @@ object TextInpainter {
             return Color.BLACK
         }
 
+        val spanWidth = right - left + 1
+        val spanHeight = bottom - top + 1
+        val pixelBuffer = IntArray(max(spanWidth, spanHeight))
+
         var redSum = 0L
         var greenSum = 0L
         var blueSum = 0L
         var count = 0
 
         try {
-            // Sample top and bottom edge borders
-            for (x in left..right step 2) {
-                val topPixel = bitmap.getPixel(x, top)
-                redSum += Color.red(topPixel)
-                greenSum += Color.green(topPixel)
-                blueSum += Color.blue(topPixel)
-                count++
-
-                val bottomPixel = bitmap.getPixel(x, bottom)
-                redSum += Color.red(bottomPixel)
-                greenSum += Color.green(bottomPixel)
-                blueSum += Color.blue(bottomPixel)
+            // Sample top and bottom edge borders in batched getPixels calls
+            bitmap.getPixels(pixelBuffer, 0, spanWidth, left, top, spanWidth, 1)
+            for (i in 0 until spanWidth step 2) {
+                val pixel = pixelBuffer[i]
+                redSum += (pixel shr 16) and 0xFF
+                greenSum += (pixel shr 8) and 0xFF
+                blueSum += pixel and 0xFF
                 count++
             }
 
-            // Sample left and right borders
-            for (y in top..bottom step 2) {
-                val leftPixel = bitmap.getPixel(left, y)
-                redSum += Color.red(leftPixel)
-                greenSum += Color.green(leftPixel)
-                blueSum += Color.blue(leftPixel)
-                count++
-
-                val rightPixel = bitmap.getPixel(right, y)
-                redSum += Color.red(rightPixel)
-                greenSum += Color.green(rightPixel)
-                blueSum += Color.blue(rightPixel)
+            bitmap.getPixels(pixelBuffer, 0, spanWidth, left, bottom, spanWidth, 1)
+            for (i in 0 until spanWidth step 2) {
+                val pixel = pixelBuffer[i]
+                redSum += (pixel shr 16) and 0xFF
+                greenSum += (pixel shr 8) and 0xFF
+                blueSum += pixel and 0xFF
                 count++
             }
-        } catch (_: Throwable) {
-            // Concurrently recycled bitmap or native pixel access failure fallback
+
+            // Sample left and right borders in batched getPixels calls
+            bitmap.getPixels(pixelBuffer, 0, 1, left, top, 1, spanHeight)
+            for (i in 0 until spanHeight step 2) {
+                val pixel = pixelBuffer[i]
+                redSum += (pixel shr 16) and 0xFF
+                greenSum += (pixel shr 8) and 0xFF
+                blueSum += pixel and 0xFF
+                count++
+            }
+
+            bitmap.getPixels(pixelBuffer, 0, 1, right, top, 1, spanHeight)
+            for (i in 0 until spanHeight step 2) {
+                val pixel = pixelBuffer[i]
+                redSum += (pixel shr 16) and 0xFF
+                greenSum += (pixel shr 8) and 0xFF
+                blueSum += pixel and 0xFF
+                count++
+            }
+        } catch (_: IllegalStateException) {
+            // Concurrently recycled bitmap fallback
+            return Color.BLACK
+        } catch (_: IllegalArgumentException) {
+            // Out-of-bounds crop fallback
             return Color.BLACK
         }
 
@@ -79,7 +94,7 @@ object TextInpainter {
         val avgGreen = (greenSum / count).toInt()
         val avgBlue = (blueSum / count).toInt()
 
-        return Color.rgb(avgRed, avgGreen, avgBlue)
+        return (0xFF shl 24) or (avgRed shl 16) or (avgGreen shl 8) or avgBlue
     }
 
     /**

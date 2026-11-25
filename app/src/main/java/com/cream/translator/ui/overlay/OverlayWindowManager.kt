@@ -55,7 +55,7 @@ class OverlayWindowManager(
         results: List<TranslationResult>,
         onDismiss: () -> Unit,
     ): Boolean {
-        if (isOverlayShowing) {
+        if (inPlaceOverlay != null || isOverlayShowing) {
             dismissTranslationOverlay()
         }
 
@@ -99,20 +99,21 @@ class OverlayWindowManager(
             isOverlayShowing = true
             true
         } else {
+            overlayView.onDismissListener = null
+            overlayView.clear()
             Timber.e("OverlayWindowManager: Không thể gắn lớp phủ dịch đè lên WindowManager")
             false
         }
     }
 
     override fun dismissTranslationOverlay(): Boolean {
-        return if (isOverlayShowing && inPlaceOverlay != null) {
-            val removed = safeRemoveView(inPlaceOverlay)
-            inPlaceOverlay = null
-            isOverlayShowing = false
-            removed
-        } else {
-            false
-        }
+        val overlay = inPlaceOverlay
+        overlay?.onDismissListener = null
+        overlay?.clear()
+        val removed = if (overlay != null) safeRemoveView(overlay) else false
+        inPlaceOverlay = null
+        isOverlayShowing = false
+        return removed
     }
 
     override fun showRegionSelector(
@@ -158,22 +159,25 @@ class OverlayWindowManager(
                     dismissRegionSelector()
                     onCancel()
                 }
-                startAutoDismissTimer(scope)
             }
 
         val added = safeAddView(selectorView, selectorParams)
         if (added) {
             regionSelectorView = selectorView
+            selectorView.startAutoDismissTimer(scope)
             Timber.d("RegionSelectorView đính kèm thành công lên WindowManager")
         } else {
+            selectorView.clearListeners()
             Timber.e("OverlayWindowManager: Không thể gắn RegionSelectorView")
         }
         return added
     }
 
     override fun dismissRegionSelector() {
-        regionSelectorView?.cancelAutoDismiss()
-        safeRemoveView(regionSelectorView)
+        val selector = regionSelectorView ?: return
+        selector.cancelAutoDismiss()
+        selector.clearListeners()
+        safeRemoveView(selector)
         regionSelectorView = null
     }
 
@@ -194,7 +198,7 @@ class OverlayWindowManager(
     override fun safeRemoveView(view: View?): Boolean =
         try {
             if (view != null && (view.isAttachedToWindow || view.windowToken != null || view.parent != null)) {
-                windowManager?.removeView(view)
+                windowManager?.removeViewImmediate(view)
                 true
             } else {
                 false

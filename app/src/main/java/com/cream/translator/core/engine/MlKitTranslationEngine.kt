@@ -46,10 +46,12 @@ class MlKitTranslationEngine : TranslationEngine {
 
             translator.downloadModelIfNeeded(conditions)
                 .addOnSuccessListener {
+                    if (!continuation.isActive) return@addOnSuccessListener
                     Timber.d("Offline model ready for %s", languagePair.displayName)
                     continuation.resume(true)
                 }
                 .addOnFailureListener { exception ->
+                    if (!continuation.isActive) return@addOnFailureListener
                     Timber.e(exception, "Failed to download model for %s", languagePair.displayName)
                     continuation.resume(false)
                 }
@@ -68,9 +70,11 @@ class MlKitTranslationEngine : TranslationEngine {
             val translator = getOrCreateTranslator(languagePair)
             translator.translate(text)
                 .addOnSuccessListener { translatedText ->
+                    if (!continuation.isActive) return@addOnSuccessListener
                     continuation.resume(translatedText)
                 }
                 .addOnFailureListener { exception ->
+                    if (!continuation.isActive) return@addOnFailureListener
                     Timber.e(exception, "Translation failed for text: %s", text)
                     continuation.resumeWithException(exception)
                 }

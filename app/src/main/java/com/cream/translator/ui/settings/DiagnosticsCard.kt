@@ -51,9 +51,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.cream.translator.CreamTranslatorApp
 import com.cream.translator.core.monitoring.LogEntry
 import com.cream.translator.core.monitoring.crash.DiagnosticExportHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun DiagnosticsCard(modifier: Modifier = Modifier) {
@@ -66,13 +68,16 @@ fun DiagnosticsCard(modifier: Modifier = Modifier) {
     val app = context.applicationContext as? CreamTranslatorApp
     var bufferSize by remember { mutableIntStateOf(app?.circularLogBuffer?.size ?: 0) }
     var avgLatency by remember { mutableLongStateOf(app?.pipelineTracer?.calculateAverageLatencyMs() ?: 0L) }
-    var hasCrash by remember { mutableStateOf(app?.crashDiagnosticCollector?.hasCrashReport() ?: false) }
+    var hasCrash by remember { mutableStateOf(false) }
 
     LaunchedEffect(refreshTrigger) {
         while (isActive) {
             bufferSize = app?.circularLogBuffer?.size ?: 0
             avgLatency = app?.pipelineTracer?.calculateAverageLatencyMs() ?: 0L
-            hasCrash = app?.crashDiagnosticCollector?.hasCrashReport() ?: false
+            hasCrash =
+                withContext(Dispatchers.IO) {
+                    app?.crashDiagnosticCollector?.hasCrashReport() ?: false
+                }
             delay(2000)
         }
     }
