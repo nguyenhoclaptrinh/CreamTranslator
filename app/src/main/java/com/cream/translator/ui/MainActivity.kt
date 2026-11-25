@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -243,15 +244,14 @@ fun TranslatorDashboard(
     var selectedPair by remember { mutableStateOf(supportedPairs.first()) }
     var isModelReady by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
-    var activeDownloadPair by remember { mutableStateOf(selectedPair) }
+    var downloadRequestId by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedPair) {
-        val requestedPair = selectedPair
-        activeDownloadPair = requestedPair
+        val requestId = ++downloadRequestId
         isDownloading = true
         isModelReady = false
-        actions.onDownloadModel(requestedPair) { success ->
-            if (activeDownloadPair == requestedPair) {
+        actions.onDownloadModel(selectedPair) { success ->
+            if (downloadRequestId == requestId) {
                 isModelReady = success
                 isDownloading = false
             }
@@ -296,11 +296,10 @@ fun TranslatorDashboard(
             selectedPair = selectedPair,
             actions = actions,
             onTriggerModelDownload = {
-                val requestedPair = selectedPair
-                activeDownloadPair = requestedPair
+                val requestId = ++downloadRequestId
                 isDownloading = true
-                actions.onDownloadModel(requestedPair) { success ->
-                    if (activeDownloadPair == requestedPair) {
+                actions.onDownloadModel(selectedPair) { success ->
+                    if (downloadRequestId == requestId) {
                         isModelReady = success
                         isDownloading = false
                     }

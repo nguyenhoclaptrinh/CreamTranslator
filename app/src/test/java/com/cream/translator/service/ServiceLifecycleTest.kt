@@ -98,4 +98,28 @@ class ServiceLifecycleTest : BaseRobolectricTest() {
         serviceController.destroy()
         assertNull(ScreenCaptureService.instance)
     }
+
+    @Test
+    fun overlayService_actionStop_stopsBothServicesAndClearsRunningState() {
+        ShadowSettings.setCanDrawOverlays(true)
+        TranslatorController.updateServiceState(true)
+        val stopIntent =
+            Intent(context, OverlayService::class.java).apply {
+                action = OverlayService.ACTION_STOP
+            }
+        val controller = Robolectric.buildService(OverlayService::class.java, stopIntent).create()
+        assertTrue(OverlayService.isRunning)
+
+        controller.startCommand(0, 0)
+
+        assertFalse(TranslatorController.isServiceRunning.value)
+        val stoppedFirst = Shadows.shadowOf(application).nextStoppedService
+        val stoppedSecond = Shadows.shadowOf(application).nextStoppedService
+        val stoppedClasses = listOfNotNull(stoppedFirst?.component?.className, stoppedSecond?.component?.className)
+        assertTrue(stoppedClasses.contains(OverlayService::class.java.name))
+        assertTrue(stoppedClasses.contains(ScreenCaptureService::class.java.name))
+
+        controller.destroy()
+        assertFalse(OverlayService.isRunning)
+    }
 }

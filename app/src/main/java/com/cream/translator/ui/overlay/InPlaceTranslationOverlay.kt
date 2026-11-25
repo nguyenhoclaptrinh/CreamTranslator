@@ -26,7 +26,6 @@ class InPlaceTranslationOverlay
             val regionId: String,
             val plateRect: RectF,
             val bgColor: Int,
-            val textColor: Int,
             val staticLayout: StaticLayout,
         )
 
@@ -119,7 +118,6 @@ class InPlaceTranslationOverlay
             val cornerRadius = 6f * density
             for (plate in preparedPlates) {
                 bgPaint.color = plate.bgColor
-                textPaint.color = plate.textColor
                 canvas.drawRoundRect(plate.plateRect, cornerRadius, cornerRadius, bgPaint)
                 canvas.drawRoundRect(plate.plateRect, cornerRadius, cornerRadius, borderPaint)
 
@@ -205,27 +203,30 @@ class InPlaceTranslationOverlay
                     displayText.length,
                     density,
                 )
-            textPaint.color = textColor
-            textPaint.textSize = currentSp * density
+            val platePaint =
+                TextPaint(textPaint).apply {
+                    color = textColor
+                    textSize = currentSp * density
+                }
 
             val isSingleLine = rect.height() < 42f * density
             val baseContentWidth = maxOf(20f, rect.width() - 2f * padX)
             val targetContentWidth =
                 if (isSingleLine) {
-                    val naturalTextWidth = textPaint.measureText(displayText)
+                    val naturalTextWidth = platePaint.measureText(displayText)
                     val maxSafeWidth = baseContentWidth + constraints.maxExpandLeft + constraints.maxExpandRight
                     naturalTextWidth.coerceIn(baseContentWidth, maxSafeWidth).toInt()
                 } else {
                     baseContentWidth.toInt()
                 }
 
-            var staticLayout = createStaticLayout(displayText, targetContentWidth)
+            var staticLayout = createStaticLayout(displayText, targetContentWidth, platePaint)
 
             val targetHeight = rect.height() - 2f * padY
             while (staticLayout.height > targetHeight && currentSp > 10f) {
                 currentSp = maxOf(10f, currentSp - 1f)
-                textPaint.textSize = currentSp * density
-                staticLayout = createStaticLayout(displayText, targetContentWidth)
+                platePaint.textSize = currentSp * density
+                staticLayout = createStaticLayout(displayText, targetContentWidth, platePaint)
             }
 
             val plateBounds =
@@ -244,7 +245,6 @@ class InPlaceTranslationOverlay
                 regionId = item.region.id,
                 plateRect = RectF(plateBounds.left, plateBounds.top, plateBounds.right, plateBounds.bottom),
                 bgColor = bgColor,
-                textColor = textColor,
                 staticLayout = staticLayout,
             )
         }
@@ -252,9 +252,10 @@ class InPlaceTranslationOverlay
         private fun createStaticLayout(
             text: String,
             width: Int,
+            paint: TextPaint,
         ): StaticLayout =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                StaticLayout.Builder.obtain(text, 0, text.length, textPaint, width)
+                StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
                     .setAlignment(Layout.Alignment.ALIGN_CENTER)
                     .setIncludePad(false)
                     .build()
@@ -262,7 +263,7 @@ class InPlaceTranslationOverlay
                 @Suppress("DEPRECATION")
                 StaticLayout(
                     text,
-                    textPaint,
+                    paint,
                     width,
                     Layout.Alignment.ALIGN_CENTER,
                     1.0f,

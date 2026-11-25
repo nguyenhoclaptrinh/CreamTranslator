@@ -12,18 +12,21 @@ class DefaultTextFilter(
 ) : TextFilter {
     constructor(staticConfig: FilterConfig) : this({ staticConfig })
 
-    @Volatile
-    private var cachedRawCustomWords: Set<String> = emptySet()
+    private data class CustomWordsCache(
+        val raw: Set<String>,
+        val normalized: Set<String>,
+    )
 
     @Volatile
-    private var cachedNormalizedCustomWords: Set<String> = emptySet()
+    private var customWordsCache = CustomWordsCache(emptySet(), emptySet())
 
     private fun getNormalizedCustomWords(rawWords: Set<String>): Set<String> {
         if (rawWords.isEmpty()) return emptySet()
-        if (rawWords == cachedRawCustomWords) return cachedNormalizedCustomWords
-        val normalizedSet = rawWords.map { it.trim().lowercase(Locale.ROOT) }.toSet()
-        cachedNormalizedCustomWords = normalizedSet
-        cachedRawCustomWords = rawWords.toSet()
+        val snapshot = customWordsCache
+        if (rawWords == snapshot.raw) return snapshot.normalized
+        val rawCopy = rawWords.toSet()
+        val normalizedSet = rawCopy.mapTo(HashSet(rawCopy.size)) { it.trim().lowercase(Locale.ROOT) }
+        customWordsCache = CustomWordsCache(raw = rawCopy, normalized = normalizedSet)
         return normalizedSet
     }
 

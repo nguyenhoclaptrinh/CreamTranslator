@@ -113,6 +113,8 @@ class FloatingTriggerController(
             Timber.d("Floating trigger attached successfully")
             true
         } else {
+            triggerButton.setOnTouchListener(null)
+            triggerParams = null
             Timber.e("Failed to attach floating overlay view")
             false
         }
@@ -125,14 +127,15 @@ class FloatingTriggerController(
         val screenWidth = windowManager.getScreenWidth()
         val screenHeight = windowManager.getScreenHeight()
         val density = context.resources.displayMetrics.density
-        val size = (52 * density).toInt()
+        val size = (OverlayConfig.TRIGGER_SIZE_DP * density).toInt()
         val margin = (12 * density).toInt()
 
         val safeMaxY = (screenHeight - size - margin).coerceAtLeast(margin)
         params.y = params.y.coerceIn(margin, safeMaxY)
 
         val isLeft = (params.x + size / 2) < (screenWidth / 2)
-        val targetX = if (isLeft) margin else (screenWidth - size - margin)
+        val rightEdgeX = (screenWidth - size - margin).coerceAtLeast(margin)
+        val targetX = if (isLeft) margin else rightEdgeX
 
         snapAnimator?.cancel()
         snapAnimator =
@@ -208,7 +211,7 @@ class FloatingTriggerController(
                         longPressJob?.cancel()
                         pendingSingleTapJob?.cancel()
                     }
-                    val safeMaxX = gestureScreenWidth - gestureSize + gestureMargin
+                    val safeMaxX = (gestureScreenWidth - gestureSize + gestureMargin).coerceAtLeast(-gestureMargin)
                     params.x = (initialX + dx).coerceIn(-gestureMargin, safeMaxX)
                     val safeMaxY = (gestureScreenHeight - gestureSize - gestureMargin).coerceAtLeast(gestureMargin)
                     params.y = (initialY + dy).coerceIn(gestureMargin, safeMaxY)

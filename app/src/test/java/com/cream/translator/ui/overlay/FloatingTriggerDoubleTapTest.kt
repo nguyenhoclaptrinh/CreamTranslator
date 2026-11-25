@@ -124,4 +124,38 @@ class FloatingTriggerDoubleTapTest : BaseRobolectricTest() {
             assertEquals(0, doubleTapCount)
             controller.destroy()
         }
+
+    @Test
+    fun dragMove_whenScreenWidthIsNarrow_doesNotThrowIllegalArgumentException() =
+        runTest(testDispatcher) {
+            val narrowWm =
+                object : IOverlayWindowManager by windowManager {
+                    override fun getScreenWidth(): Int = 0
+
+                    override fun getScreenHeight(): Int = 0
+                }
+            val controller = FloatingTriggerController(context, narrowWm, this)
+
+            controller.setupFloatingTrigger(
+                onClick = {},
+                onDoubleTap = {},
+                onLongPress = {},
+            )
+            val view = controller.floatingTriggerView!!
+
+            val t = SystemClock.uptimeMillis()
+            val down = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 10f, 10f, 0)
+            view.dispatchTouchEvent(down)
+            down.recycle()
+
+            val move = MotionEvent.obtain(t, t + 16, MotionEvent.ACTION_MOVE, 60f, 60f, 0)
+            view.dispatchTouchEvent(move)
+            move.recycle()
+
+            val cancel = MotionEvent.obtain(t, t + 32, MotionEvent.ACTION_CANCEL, 60f, 60f, 0)
+            view.dispatchTouchEvent(cancel)
+            cancel.recycle()
+
+            controller.destroy()
+        }
 }

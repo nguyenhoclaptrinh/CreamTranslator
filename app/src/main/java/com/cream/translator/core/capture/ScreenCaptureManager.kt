@@ -331,20 +331,23 @@ class ScreenCaptureManager(
         }
 
         val rowPadding = (rowStride - pixelStride * imgWidth).coerceAtLeast(0)
+        val rawWidth = imgWidth + rowPadding / pixelStride
         val rawBitmap =
             Bitmap.createBitmap(
-                imgWidth + rowPadding / pixelStride,
+                rawWidth,
                 imgHeight,
                 Bitmap.Config.ARGB_8888,
             )
         onRawAllocated(rawBitmap)
         rawBitmap.copyPixelsFromBuffer(buffer)
 
-        return if (rowPadding == 0) {
+        return if (rawWidth == imgWidth) {
             rawBitmap
         } else {
             val cleanBitmap = Bitmap.createBitmap(rawBitmap, 0, 0, imgWidth, imgHeight)
-            rawBitmap.recycle()
+            if (cleanBitmap !== rawBitmap) {
+                rawBitmap.recycle()
+            }
             cleanBitmap
         }
     }

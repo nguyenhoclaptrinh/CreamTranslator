@@ -55,7 +55,7 @@ class OverlayWindowManager(
         results: List<TranslationResult>,
         onDismiss: () -> Unit,
     ): Boolean {
-        if (isOverlayShowing) {
+        if (inPlaceOverlay != null || isOverlayShowing) {
             dismissTranslationOverlay()
         }
 
@@ -99,6 +99,8 @@ class OverlayWindowManager(
             isOverlayShowing = true
             true
         } else {
+            overlayView.onDismissListener = null
+            overlayView.clear()
             Timber.e("OverlayWindowManager: Không thể gắn lớp phủ dịch đè lên WindowManager")
             false
         }
@@ -157,14 +159,15 @@ class OverlayWindowManager(
                     dismissRegionSelector()
                     onCancel()
                 }
-                startAutoDismissTimer(scope)
             }
 
         val added = safeAddView(selectorView, selectorParams)
         if (added) {
             regionSelectorView = selectorView
+            selectorView.startAutoDismissTimer(scope)
             Timber.d("RegionSelectorView đính kèm thành công lên WindowManager")
         } else {
+            selectorView.clearListeners()
             Timber.e("OverlayWindowManager: Không thể gắn RegionSelectorView")
         }
         return added

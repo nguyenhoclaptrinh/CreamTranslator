@@ -171,6 +171,7 @@ class OverlayService : Service() {
     ): Int {
         if (intent?.action == ACTION_STOP) {
             Timber.d("OverlayService nhận lệnh ACTION_STOP")
+            TranslatorController.stop(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -323,10 +324,10 @@ class OverlayService : Service() {
         overlayWindowManager.dismissTranslationOverlay()
         overlayWindowManager.dismissRegionSelector()
         floatingTriggerController.destroy()
+        serviceScope.cancel()
         if (pipelineCoordinatorDelegate.isInitialized()) {
             pipelineCoordinator.close()
         }
-        serviceScope.cancel()
         TranslatorController.updateServiceState(false)
         if (ScreenCaptureService.instance != null) {
             try {
